@@ -495,3 +495,6 @@ dialog[open] { animation: apparait var(--normal) var(--courbe); }
   .hero .entete-depot p { text-shadow: 0 1px 8px rgba(11, 16, 38, 0.9); }
 }
 @media (prefers-reduced-motion: reduce) { .hero::before { animation: none; } }
+
+.pied { text-align: center; padding: 0 1rem 2rem; font-size: 0.85rem; }
+.pied a { color: var(--encre-2); }
