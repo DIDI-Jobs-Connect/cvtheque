@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>CVthèque · espace équipe</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='9' width='26' height='19' rx='3' fill='%2316202a'/%3E%3Crect x='5' y='4' width='12' height='7' rx='2' fill='%23d4a03a'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <div id="config-manquante" class="config-manquante" hidden>
+    <h2>CVthèque pas encore reliée</h2>
+    <p>Renseignez l'adresse et la clé Supabase dans <code>assets/config.js</code> (voir le guide).</p>
+  </div>
+
+  <main id="ecran-connexion" class="connexion" hidden>
+    <form id="form-connexion" class="panneau">
+      <h1 class="nom-cvtheque">CVthèque</h1>
+      <p class="aide">Espace réservé à l'équipe de recrutement.</p>
+      <label class="champ"><span>Email</span><input type="email" name="email" required autocomplete="username"></label>
+      <label class="champ"><span>Mot de passe</span><input type="password" name="mdp" required autocomplete="current-password"></label>
+      <button class="bouton" type="submit">Se connecter</button>
+      <p class="erreur" id="erreur-connexion" role="alert"></p>
+    </form>
+  </main>
+
+  <main id="ecran-refuse" class="connexion" hidden>
+    <div class="panneau">
+      <h1>Accès non autorisé</h1>
+      <p>Le compte <b id="email-refuse"></b> n'est pas membre de l'équipe. Demandez à l'administrateur de l'ajouter.</p>
+      <p style="margin-top:1rem"><button class="bouton discret" type="button" data-action="deconnexion">Se déconnecter</button></p>
+    </div>
+  </main>
+
+  <div id="appli" class="appli" hidden>
+    <header class="barre">
+      <button class="bouton discret petit bouton-filtres" type="button" data-action="filtres" aria-controls="filtres" aria-expanded="false">Filtres</button>
+      <span class="nom nom-cvtheque">CVthèque</span>
+      <nav class="vues" aria-label="Vues">
+        <button type="button" data-vue="fiches" aria-current="page">Fiches</button>
+        <button type="button" data-vue="demandes">Demandes</button>
+      </nav>
+      <label class="recherche"><span class="visuellement-cache">Rechercher</span>
+        <input type="search" id="recherche" placeholder="Rechercher : comptable Cotonou, Sage, anglais…" autocomplete="off">
+      </label>
+      <div class="compte">
+        <button class="bouton petit" type="button" data-action="nouvelle-fiche">Ajouter une fiche</button>
+        <span id="email-compte" class="aide"></span>
+        <button class="bouton discret petit" type="button" data-action="deconnexion">Se déconnecter</button>
+      </div>
+    </header>
+    <div class="corps-appli" id="corps-appli">
+      <aside class="filtres" id="filtres" aria-label="Filtres"></aside>
+      <main class="contenu" id="contenu"></main>
+    </div>
+  </div>
+
+  <aside class="dossier" id="dossier" hidden aria-label="Dossier du candidat"></aside>
+
+  <dialog id="fenetre-fiche"><form id="form-fiche" method="dialog" novalidate></form></dialog>
+  <dialog id="fenetre-demande"><form id="form-demande" method="dialog" novalidate></form></dialog>
+  <div id="flash" class="message-flash" role="status" hidden></div>
+
+  <script type="module" src="assets/espace.js"></script>
+</body>
+</html>

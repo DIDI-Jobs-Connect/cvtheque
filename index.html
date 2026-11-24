@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Déposer mon CV</title>
+  <meta name="description" content="Déposez votre CV dans notre CVthèque : nous vous contactons quand un poste correspond à votre profil.">
+  <meta property="og:title" content="Déposez votre CV dans notre CVthèque">
+  <meta property="og:description" content="Nous vous contactons quand un recruteur cherche votre profil.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='9' width='26' height='19' rx='3' fill='%23285c4d'/%3E%3Crect x='5' y='4' width='12' height='7' rx='2' fill='%23d4a03a'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <main class="depot">
+    <header class="marque">
+      <strong id="nom-cvtheque">CVthèque</strong>
+      <span id="organisation"></span>
+    </header>
+
+    <div id="config-manquante" class="config-manquante" hidden>
+      <h2>CVthèque pas encore reliée</h2>
+      <p>Renseignez l'adresse et la clé Supabase dans <code>assets/config.js</code> (voir le guide).</p>
+    </div>
+
+    <div id="zone-formulaire">
+      <section class="entete-depot">
+        <h1>Laissez votre CV, on vous appelle quand un poste vous correspond.</h1>
+        <p>Votre dossier est classé dans notre CVthèque. Seule notre équipe de recrutement le consulte, et nous ne le transmettons à un recruteur qu'avec votre accord.</p>
+      </section>
+
+      <form id="depot" novalidate>
+        <fieldset class="etape">
+          <legend><span class="etape-titre"><b>1</b><h2>Ce que vous cherchez</h2></span></legend>
+          <p class="champ"><span id="titre-domaine">Votre domaine</span></p>
+          <div class="classeur" id="domaines" role="radiogroup" aria-labelledby="titre-domaine"></div>
+          <div class="grille">
+            <label class="champ"><span>Poste(s) recherché(s)</span>
+              <input type="text" name="postes" required maxlength="300" placeholder="Ex. : comptable, aide-comptable">
+            </label>
+            <div class="champ"><span id="titre-contrats">Types de contrat</span>
+              <div class="cases" id="contrats" role="group" aria-labelledby="titre-contrats"></div>
+            </div>
+            <div class="grille deux">
+              <label class="champ"><span>Disponibilité</span><select name="disponibilite" id="disponibilite"></select></label>
+              <label class="champ"><span>Prétentions salariales <small>(facultatif)</small></span>
+                <input type="text" name="pretentions" maxlength="80" placeholder="Ex. : 150 000 FCFA / mois">
+              </label>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="etape">
+          <legend><span class="etape-titre"><b>2</b><h2>Vos coordonnées</h2></span></legend>
+          <div class="grille deux">
+            <label class="champ"><span>Prénom</span><input type="text" name="prenom" required maxlength="80" autocomplete="given-name"></label>
+            <label class="champ"><span>Nom</span><input type="text" name="nom" required maxlength="80" autocomplete="family-name"></label>
+            <label class="champ"><span>Téléphone (WhatsApp)</span><input type="tel" name="telephone" required maxlength="40" autocomplete="tel" placeholder="01 XX XX XX XX"></label>
+            <label class="champ"><span>Email <small>(facultatif)</small></span><input type="email" name="email" maxlength="160" autocomplete="email"></label>
+            <label class="champ"><span>Ville ou commune</span><input type="text" name="ville" required maxlength="80" placeholder="Ex. : Cotonou, Porto-Novo, Parakou"></label>
+            <label class="champ"><span>Pays</span><input type="text" name="pays" maxlength="60" value="Bénin"></label>
+          </div>
+        </fieldset>
+
+        <fieldset class="etape">
+          <legend><span class="etape-titre"><b>3</b><h2>Votre parcours et votre CV</h2></span></legend>
+          <div class="grille">
+            <div class="grille deux">
+              <label class="champ"><span>Niveau d'études</span><select name="niveau" id="niveau"></select></label>
+              <label class="champ"><span>Années d'expérience</span><input type="number" name="experience" min="0" max="60" inputmode="numeric" placeholder="0 si vous débutez"></label>
+            </div>
+            <label class="champ"><span>Vos principales compétences</span>
+              <textarea name="competences" maxlength="1000" placeholder="Ex. : Sage, Excel, déclarations fiscales, permis B…"></textarea>
+            </label>
+            <div class="grille deux">
+              <label class="champ"><span>Langues parlées</span><input type="text" name="langues" maxlength="160" placeholder="Ex. : français, fon, anglais"></label>
+              <label class="champ"><span>Profil LinkedIn <small>(facultatif)</small></span><input type="url" name="linkedin" maxlength="300" placeholder="https://linkedin.com/in/…"></label>
+            </div>
+            <label class="champ"><span>Un mot pour le recruteur <small>(facultatif)</small></span>
+              <textarea name="message" maxlength="1000" placeholder="Ce qui vous motive, une préférence de lieu…"></textarea>
+            </label>
+            <label class="fichier">
+              <b>Votre CV</b>
+              <span class="aide">PDF ou Word, 5 Mo maximum.</span>
+              <input type="file" name="cv" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required>
+            </label>
+          </div>
+          <label class="piege" aria-hidden="true">Site web <input type="text" name="site_web" tabindex="-1" autocomplete="off"></label>
+          <label class="accord">
+            <input type="checkbox" name="consentement" required>
+            <span>J'accepte que <span class="nom-organisation">notre équipe</span> conserve mon CV et mes informations pour me proposer des offres d'emploi, et les transmette à des recruteurs. Je peux demander leur suppression à tout moment.</span>
+          </label>
+          <div class="envoi">
+            <button class="bouton" type="submit" id="bouton-envoi">Envoyer mon CV</button>
+            <p class="erreur" id="erreur" role="alert"></p>
+          </div>
+        </fieldset>
+      </form>
+    </div>
+
+    <section id="confirmation" class="classe" hidden tabindex="-1">
+      <div class="chemise" id="chemise-classee">
+        <span class="onglet"></span>
+        <div class="corps">
+          <h2 id="confirmation-titre">Votre CV est classé.</h2>
+          <p id="confirmation-texte"></p>
+          <p>Gardez votre téléphone joignable : nous vous appelons ou vous écrivons sur WhatsApp dès qu'un recruteur cherche votre profil.</p>
+          <div class="envoi">
+            <button class="bouton" type="button" id="partager">Partager ce formulaire</button>
+            <a class="bouton secondaire" id="lien-chaine" hidden target="_blank" rel="noopener">Rejoindre la chaîne WhatsApp</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="assets/deposer.js"></script>
+</body>
+</html>
