@@ -64,16 +64,16 @@ Dans le même fichier, vous pouvez aussi renseigner le lien de votre chaîne Wha
 
 Dans le dépôt GitHub de la CVthèque : **Settings** → **Pages** → **Source : Deploy from a branch** →
 branche **main**, dossier **/ (root)** → **Save**. Après 1 à 2 minutes, l'adresse s'affiche, du type
-`https://votre-compte.github.io/cvtheque/`.
+`https://didi-jobs-connect.github.io/cvtheque/`.
 
 ## 6. Les liens à utiliser
 
 | Pour | Lien |
 | --- | --- |
-| Formulaire de dépôt (à partager) | `https://votre-compte.github.io/cvtheque/` |
-| Même formulaire, depuis votre chaîne WhatsApp | `https://votre-compte.github.io/cvtheque/?source=chaine` |
-| Même formulaire, pour les personnes que vous accompagnez | `https://votre-compte.github.io/cvtheque/?source=accompagnement` |
-| Espace équipe (privé) | `https://votre-compte.github.io/cvtheque/espace.html` |
+| Formulaire de dépôt (à partager) | `https://didi-jobs-connect.github.io/cvtheque/` |
+| Même formulaire, depuis votre chaîne WhatsApp | `https://didi-jobs-connect.github.io/cvtheque/?source=chaine` |
+| Même formulaire, pour les personnes que vous accompagnez | `https://didi-jobs-connect.github.io/cvtheque/?source=accompagnement` |
+| Espace équipe (privé) | `https://didi-jobs-connect.github.io/cvtheque/espace.html` |
 
 Le mot après `?source=` apparaît dans chaque fiche (« Provenance ») : vous savez d'où vient chaque CV.
 
