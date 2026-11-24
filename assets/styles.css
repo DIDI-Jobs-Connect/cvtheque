@@ -637,3 +637,120 @@ dialog.large { width: min(860px, calc(100% - 2rem)); }
 }
 .demandes > *, .contenu, #detail-poste, #detail-entreprise { min-width: 0; }
 .demande-carte small { display: block; }
+
+/* ===================== Pages publiques : offres, entreprises, lien recruteur ===================== */
+.nav-publique { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-left: auto; }
+.nav-publique a { padding: 0.45rem 0.8rem; border-radius: 99px; color: #fff; text-decoration: none; font-weight: 700; font-size: 0.9rem; border: 1px solid rgba(255, 255, 255, 0.28); background: rgba(255, 255, 255, 0.08); backdrop-filter: blur(6px); transition: background var(--vite) var(--courbe); }
+.nav-publique a:hover { background: rgba(255, 255, 255, 0.2); }
+.nav-publique a[aria-current="page"] { background: #fff; color: var(--encre); }
+.hero .marque .badge-cvtheque + .nav-publique { margin-left: auto; }
+.hero.court { padding-bottom: 6.5rem; }
+.titre-public { color: #fff; font-size: clamp(1.9rem, 4.6vw, 3.1rem); font-weight: 800; max-width: 22ch; text-shadow: 0 2px 24px rgba(11, 16, 38, 0.6); }
+.sous-titre-public { margin-top: 0.9rem; max-width: 60ch; color: rgba(255, 255, 255, 0.88); font-size: 1.05rem; }
+.page-publique { position: relative; max-width: 980px; margin: -4.5rem auto 0; padding: 0 1rem 4rem; }
+.titre-section { font-size: 1.5rem; font-weight: 800; margin: 0 0 1rem; }
+
+/* Offres */
+.barre-offres { display: grid; grid-template-columns: 1fr minmax(180px, 260px); gap: 0.6rem; padding: 0.8rem; border-radius: var(--rayon); background: var(--papier); box-shadow: 0 18px 50px rgba(11, 16, 38, 0.18); }
+.barre-offres input, .barre-offres select { min-height: 48px; }
+#compte-offres { margin: 1rem 0 0.5rem; }
+.liste-offres { display: grid; gap: 0.9rem; }
+.offre { position: relative; padding: 1.2rem 1.3rem 1.1rem 1.5rem; border-radius: var(--rayon); background: var(--papier); border: 1px solid var(--trait); overflow: hidden; animation: monte var(--normal) var(--courbe) both; animation-delay: calc(var(--i, 0) * 50ms); }
+.offre::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 6px; background: var(--c); }
+.offre-tete { display: flex; justify-content: space-between; gap: 1rem; font-size: 0.82rem; }
+.offre-domaine { font-weight: 700; color: var(--c); filter: brightness(0.75); text-transform: uppercase; letter-spacing: 0.04em; }
+.offre-date { color: var(--encre-2); }
+.offre h2 { margin-top: 0.4rem; font-size: 1.35rem; font-weight: 800; }
+.offre-entreprise { color: var(--encre-2); font-weight: 700; margin-top: 0.15rem; }
+.offre-infos { list-style: none; margin: 0.7rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.offre-infos li { font-size: 0.85rem; padding: 0.15rem 0.6rem; border-radius: 99px; background: var(--fond); border: 1px solid var(--trait); }
+.offre details { margin-top: 0.8rem; }
+.offre summary { cursor: pointer; font-weight: 700; color: var(--action); }
+.offre details p { margin-top: 0.5rem; white-space: pre-wrap; color: var(--encre-2); }
+.offre-pied { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; margin-top: 1rem; }
+@keyframes monte { from { opacity: 0; transform: translateY(10px); } }
+
+.offre-choisie { display: grid; gap: 0.1rem; padding: 1rem 1.2rem; margin-bottom: 1rem; border-radius: var(--rayon); background: var(--papier); border-left: 6px solid var(--c, var(--action)); box-shadow: 0 18px 50px rgba(11, 16, 38, 0.18); }
+.offre-choisie b { font: 800 1.25rem var(--titre); }
+.offre-choisie a { font-size: 0.88rem; font-weight: 700; }
+.depot > #zone-formulaire > .offre-choisie:not([hidden]) + form > .etape:first-child { box-shadow: none; }
+
+/* Formules */
+.formules { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; padding: 1.2rem; border-radius: calc(var(--rayon) + 4px); background: var(--papier); box-shadow: 0 18px 50px rgba(11, 16, 38, 0.18); }
+.formule { position: relative; display: flex; flex-direction: column; gap: 0.6rem; padding: 1.3rem; border-radius: var(--rayon); border: 1px solid var(--trait); background: var(--fond); }
+.formule.conseillee { background: var(--encre); color: #fff; border-color: var(--encre); }
+.formule.conseillee p, .formule.conseillee li { color: rgba(255, 255, 255, 0.85); }
+.formule-ruban { position: absolute; top: -0.7rem; left: 1.3rem; padding: 0.15rem 0.7rem; border-radius: 99px; background: var(--ambre); color: var(--encre); font-size: 0.75rem; font-weight: 800; }
+.formule h3 { font-size: 1.15rem; }
+.formule-prix { display: grid; }
+.formule-prix b { font: 800 1.6rem/1.1 var(--titre); color: var(--action); }
+.formule.conseillee .formule-prix b { color: var(--ambre); }
+.formule-prix small { color: var(--encre-2); }
+.formule.conseillee .formule-prix small { color: rgba(255, 255, 255, 0.7); }
+.formule ul { margin: 0; padding-left: 1.1rem; font-size: 0.92rem; display: grid; gap: 0.2rem; flex: 1; }
+.formule .bouton { margin-top: 0.4rem; }
+.formule.conseillee .bouton { background: var(--ambre); color: var(--encre); }
+.demande-entreprise { margin-top: 2rem; }
+.demande-entreprise form { margin-top: 1rem; display: grid; gap: 1rem; }
+.demande-envoyee { margin-top: 1rem; display: grid; gap: 0.6rem; }
+.demande-envoyee h2 { font-size: 1.5rem; color: var(--ok); }
+
+/* Lien recruteur */
+.page-recruteur .page-publique { margin-top: 0; padding-top: 1.5rem; }
+.barre-recruteur { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.8rem 1.2rem; background: var(--papier); border-bottom: 1px solid var(--trait); }
+.barre-recruteur img { height: 40px; width: auto; }
+.entete-recruteur { padding: 1.4rem; border-radius: var(--rayon); background: var(--encre); color: #fff; display: grid; gap: 0.3rem; }
+.entete-recruteur .aide { color: rgba(255, 255, 255, 0.72); }
+.entete-recruteur h1 { font-size: clamp(1.5rem, 3.5vw, 2.2rem); font-weight: 800; }
+.resume-recruteur { margin-top: 0.5rem; font-size: 1.05rem; }
+.resume-recruteur b { color: var(--ambre); }
+.profils-recruteur { display: grid; gap: 1rem; margin-top: 1rem; }
+.profil-recruteur { position: relative; padding: 1.2rem 1.3rem 1.2rem 1.5rem; border-radius: var(--rayon); background: var(--papier); border: 1px solid var(--trait); overflow: hidden; display: grid; gap: 0.7rem; animation: monte var(--normal) var(--courbe) both; animation-delay: calc(var(--i, 0) * 60ms); }
+.profil-recruteur::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 6px; background: var(--c); }
+.profil-tete { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+.profil-tete h2 { font-size: 1.3rem; }
+.profil-tete .poste { color: var(--encre-2); }
+.form-avis fieldset { border: 0; padding: 0.9rem 0 0; margin: 0; border-top: 1px solid var(--trait); }
+.form-avis legend { font: 700 0.95rem var(--titre); padding: 0; margin-bottom: 0.5rem; }
+.choix-avis { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.6rem; }
+.avis { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.8rem; border-radius: 99px; border: 1px solid var(--trait); cursor: pointer; font-weight: 700; font-size: 0.9rem; }
+.avis input { accent-color: var(--action); }
+.avis.rencontrer:has(input:checked) { background: #dcf5e6; border-color: var(--ok); color: #146c3f; }
+.avis.reserve:has(input:checked) { background: #fff0d9; border-color: var(--ambre); color: #8a4f00; }
+.avis.non:has(input:checked) { background: #fdf1f2; border-color: var(--tampon); color: var(--tampon); }
+
+/* Espace équipe : nouveautés */
+.badge-avis { display: inline-block; font-size: 0.72rem; font-weight: 700; padding: 0.05rem 0.45rem; border-radius: 4px; }
+.badge-avis.rencontrer { background: #dcf5e6; color: #146c3f; }
+.badge-avis.reserve { background: #fff0d9; color: #8a4f00; }
+.badge-avis.non { background: #fdf1f2; color: var(--tampon); }
+.badge-candidature { display: inline-block; font-size: 0.72rem; font-weight: 700; padding: 0.05rem 0.45rem; border-radius: 4px; background: #e2e8ff; color: var(--action-fonce); }
+.partage { display: grid; gap: 0.6rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--trait); }
+.partage-ligne { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.8rem; }
+.partage-ligne b { font-family: var(--titre); }
+.interrupteur { display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 700; cursor: pointer; }
+.interrupteur input { width: 20px; height: 20px; accent-color: var(--ok); }
+.pastille { display: inline-grid; place-items: center; min-width: 1.3rem; height: 1.3rem; padding: 0 0.35rem; margin-left: 0.3rem; border-radius: 99px; background: var(--ambre); color: var(--encre); font-size: 0.72rem; font-weight: 800; vertical-align: 1px; }
+.demandes-recues { display: grid; gap: 0.6rem; margin-bottom: 1.25rem; }
+.demande-recue { display: grid; gap: 0.35rem; padding: 0.9rem 1rem; border-radius: var(--rayon); background: var(--papier); border: 1px solid var(--trait); border-left: 4px solid var(--ambre); }
+.demande-recue.contactee { border-left-color: var(--action); }
+.demande-recue-tete { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.8rem; }
+.demande-recue-tete b { font-family: var(--titre); font-size: 1.05rem; }
+.demande-recue .envoi { justify-content: flex-start; flex-wrap: wrap; margin-top: 0.3rem; }
+.import-offre textarea { min-height: 220px; font-size: 0.92rem; }
+
+@media (max-width: 860px) {
+  .formules { grid-template-columns: 1fr; }
+  .barre-offres { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .hero .marque { flex-wrap: wrap; }
+  .nav-publique { margin-left: 0; width: 100%; }
+  .nav-publique a { font-size: 0.82rem; padding: 0.35rem 0.65rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .offre, .profil-recruteur { animation: none; }
+}
+.hero.court .hero-contenu { max-width: 980px; }
+.page-publique > section:first-child > .titre-section { color: #fff; text-shadow: 0 2px 14px rgba(11, 16, 38, 0.7); }
+.poste-tete .details-poste { max-height: 9.5em; overflow: auto; padding-right: 0.5rem; }

@@ -106,7 +106,33 @@ function signalerErreur(texte) {
 }
 
 // ?source=chaine, ?source=accompagnement… : d'où vient la personne (visible dans l'espace équipe).
-const source = new URLSearchParams(location.search).get("source")?.slice(0, 60) || "formulaire";
+const params = new URLSearchParams(location.search);
+const offreId = /^[0-9a-f-]{36}$/i.test(params.get("offre") || "") ? params.get("offre") : null;
+const source = params.get("source")?.slice(0, 60) || (offreId ? "offre" : "formulaire");
+let offre = null;
+
+// Candidature à une offre précise (lien « Postuler » de la page des offres).
+async function chargerOffre() {
+  if (!offreId || !configuree) return;
+  const { data } = await sb.rpc("offres_publiques");
+  offre = (data || []).find((o) => o.id === offreId) || null;
+  const zoneOffre = $("#offre-choisie");
+  if (!offre) {
+    zoneOffre.hidden = false;
+    zoneOffre.innerHTML = `<p>Cette offre est pourvue ou n'est plus en ligne. Déposez quand même votre CV : nous vous proposerons les prochains postes qui vous correspondent. <a href="offres.html">Voir les autres offres</a></p>`;
+    return;
+  }
+  zoneOffre.hidden = false;
+  zoneOffre.style.setProperty("--c", couleurDomaine(offre.domaine));
+  zoneOffre.innerHTML = `<span class="aide">Vous postulez à</span><b>${esc(offre.titre)}</b><span class="aide">${esc([offre.entreprise, offre.ville, offre.contrat].filter(Boolean).join(", "))}</span><a href="offres.html">Changer d'offre</a>`;
+  const radio = [...document.querySelectorAll('[name="domaine"]')].find((r) => r.value === offre.domaine);
+  if (radio) { radio.checked = true; radio.dispatchEvent(new Event("change", { bubbles: true })); }
+  const postes = form.querySelector('[name="postes"]');
+  if (!postes.value) postes.value = offre.titre;
+  $("#bouton-envoi").textContent = "Envoyer ma candidature";
+  progression();
+}
+chargerOffre();
 
 function verifier(d, fichier) {
   if (!d.domaine) return "Choisissez votre domaine.";
@@ -147,6 +173,7 @@ form.addEventListener("submit", async (e) => {
     message: (f.get("message") || "").trim(),
     consentement: f.get("consentement") === "on",
     source,
+    offre_id: offre?.id || null,
   };
   const probleme = verifier(d, fichier);
   if (probleme) {
@@ -174,7 +201,7 @@ form.addEventListener("submit", async (e) => {
       : "L'envoi n'a pas abouti. Réessayez dans un instant ; si le problème continue, envoyez-nous votre CV sur WhatsApp.");
     bouton.classList.remove("charge");
     bouton.disabled = false;
-    bouton.textContent = "Envoyer mon CV";
+    bouton.textContent = offre ? "Envoyer ma candidature" : "Envoyer mon CV";
   }
 });
 
@@ -195,7 +222,9 @@ function confirmer(d, resultat) {
   }).join("");
   $("#confirmation-titre").textContent =
     resultat === "mis_a_jour" ? `Merci ${d.prenom}, votre dossier est mis à jour.` : `Merci ${d.prenom}, votre CV est classé.`;
-  $("#confirmation-texte").textContent = `Il est rangé dans « ${d.domaine} », pour les postes : ${d.postes}.`;
+  $("#confirmation-texte").textContent = offre
+    ? `Votre candidature pour « ${offre.titre} » est transmise à notre équipe. Votre CV est aussi rangé dans « ${d.domaine} » pour les prochaines offres.`
+    : `Il est rangé dans « ${d.domaine} », pour les postes : ${d.postes}.`;
   if (CONFIG.chaineWhatsapp) {
     const lien = $("#lien-chaine");
     lien.href = CONFIG.chaineWhatsapp;

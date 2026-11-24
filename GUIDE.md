@@ -38,6 +38,10 @@ Toujours dans **SQL Editor** → **New query** : copiez tout le contenu de **`su
 **Run**. Il ajoute les entreprises, les contacts, les relances, le pipeline par étapes et le tableau de
 bord. Vous pouvez le relancer sans risque : il ne supprime aucune donnée.
 
+### 2 ter. Ajouter les offres, l'espace entreprises et le lien recruteur
+
+Même chose avec **`supabase/offres.sql`** (après `crm.sql`) : **New query**, coller, **Run**.
+
 ## 3. Créer votre compte d'accès
 
 1. Menu de gauche → **Authentication** → **Sign In / Providers** : désactivez
@@ -80,6 +84,8 @@ branche **main**, dossier **/ (root)** → **Save**. Après 1 à 2 minutes, l'ad
 | Formulaire de dépôt (à partager) | `https://didi-jobs-connect.github.io/cvtheque/` |
 | Même formulaire, depuis votre chaîne WhatsApp | `https://didi-jobs-connect.github.io/cvtheque/?source=chaine` |
 | Même formulaire, pour les personnes que vous accompagnez | `https://didi-jobs-connect.github.io/cvtheque/?source=accompagnement` |
+| Page des offres (à partager) | `https://didi-jobs-connect.github.io/cvtheque/offres.html` |
+| Page entreprises « Vous recrutez ? » | `https://didi-jobs-connect.github.io/cvtheque/recruter.html` |
 | Espace équipe (privé) | `https://didi-jobs-connect.github.io/cvtheque/espace.html` |
 
 Le mot après `?source=` apparaît dans chaque fiche (« Provenance ») : vous savez d'où vient chaque CV.
@@ -102,6 +108,20 @@ Le mot après `?source=` apparaît dans chaque fiche (« Provenance ») : vous s
   fiche suit automatiquement.
 - **Envoyer la shortlist** : **Message pour le client** copie la liste des candidats présentés avec un
   lien vers chaque CV (valable 7 jours), à coller dans WhatsApp ou un email.
+- **Une offre vous est transmise** (WhatsApp, email…) : **Postes** → **Coller une offre reçue**. L'outil
+  remplit le poste (intitulé, domaine, ville, contrat, expérience, salaire, date limite), le publie sur la
+  page des offres et ajoute aussitôt les profils compatibles (score de 60 ou plus) de la CVthèque.
+  Les candidats qui postulent en ligne arrivent dans la colonne « Sourcé » avec l'étiquette
+  « A postulé en ligne ». « Partager sur WhatsApp » prépare l'annonce avec le lien pour postuler.
+- **Une entreprise remplit la page « Vous recrutez ? »** : sa demande apparaît dans **Entreprises** →
+  **Demandes reçues** (pastille orange sur l'onglet et alerte au tableau de bord). **Créer le poste**
+  crée l'entreprise, son contact et le poste pré-rempli. Les tarifs affichés se modifient dans
+  `assets/config.js` (rubrique `formules`).
+- **Transmettre les profils à un recruteur** : sur le poste, **Lien recruteur** → **Créer le lien privé**
+  puis **Envoyer sur WhatsApp**. Le recruteur voit les candidats passés à « Présenté au client » (et
+  au-delà), ouvre leur CV (liens valables 30 jours) et répond « Je veux le/la rencontrer », « En
+  réserve » ou « Pas retenu ». Son avis s'affiche sur la carte ; s'il veut rencontrer quelqu'un, une
+  relance est créée pour vous. Il ne voit ni téléphone ni email. **Couper le lien** le désactive.
 - **Ne rien oublier** : bouton **Relance** sur une fiche, un poste ou une entreprise (« rappeler jeudi »).
 - **Une personne redépose son CV** (même téléphone ou même email) : sa fiche est mise à jour,
   l'ancien CV reste dans l'historique.

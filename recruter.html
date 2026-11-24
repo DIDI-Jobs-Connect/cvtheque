@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vous recrutez ?</title>
+  <meta name="description" content="Confiez votre recrutement à DIDI Jobs Connect : des profils présélectionnés dans notre CVthèque, envoyés rapidement.">
+  <meta property="og:title" content="Vous recrutez ? DIDI Jobs Connect trouve vos profils">
+  <meta property="og:description" content="Décrivez votre besoin : nous vous envoyons des candidats présélectionnés.">
+  <meta property="og:image" content="assets/brand/logo.png?v=4">
+  <meta name="theme-color" content="#4263f0">
+  <link rel="icon" href="assets/brand/icon.png">
+  <link rel="stylesheet" href="assets/styles.css?v=6">
+</head>
+<body>
+  <header class="hero court">
+    <div class="hero-contenu">
+      <div class="marque">
+        <a class="logo" href="./"><img src="assets/brand/logo-white.png?v=4" alt="Didi Job Connect" width="99" height="46"></a>
+        <nav class="nav-publique" aria-label="Pages">
+          <a href="./">Déposer mon CV</a>
+          <a href="offres.html">Offres</a>
+          <a href="recruter.html" aria-current="page">Vous recrutez ?</a>
+        </nav>
+      </div>
+      <h1 class="titre-public">Vous cherchez un profil ?<br>Il est peut-être déjà dans notre CVthèque.</h1>
+      <p class="sous-titre-public">Décrivez le poste. Nous sélectionnons les candidats, vérifions leur dossier par téléphone et vous envoyons une shortlist prête à convoquer.</p>
+      
+    </div>
+  </header>
+  <main class="page-publique">
+    <section aria-labelledby="titre-formules">
+      <h2 class="titre-section" id="titre-formules">Nos formules</h2>
+      <div class="formules" id="formules"></div>
+    </section>
+
+    <section class="etape demande-entreprise" id="zone-demande" aria-labelledby="titre-demande">
+      <span class="etape-titre"><b>✎</b><h2 id="titre-demande">Votre demande de profils</h2></span>
+      <form id="form-demande" novalidate>
+        <div class="champ"><span id="titre-formule">Formule souhaitée</span>
+          <div class="cases" id="choix-formule" role="radiogroup" aria-labelledby="titre-formule"></div>
+        </div>
+        <div class="grille deux">
+          <label class="champ"><span>Poste à pourvoir</span><input type="text" name="poste" required maxlength="200" placeholder="Ex. : Comptable confirmé(e)"></label>
+          <label class="champ"><span>Nombre de postes</span><input type="number" name="nb_postes" min="1" max="99" value="1"></label>
+          <label class="champ"><span>Contrat</span><select name="contrat" id="contrat"></select></label>
+          <label class="champ"><span>Expérience minimale (ans)</span><input type="number" name="experience_min" min="0" max="40" placeholder="0 si débutant accepté"></label>
+          <label class="champ"><span>Salaire ou budget <small>(facultatif)</small></span><input type="text" name="budget" maxlength="120" placeholder="Ex. : 200 000 FCFA / mois"></label>
+          <label class="champ"><span>À pourvoir avant le <small>(facultatif)</small></span><input type="date" name="echeance"></label>
+        </div>
+        <label class="champ"><span>Missions et profil recherché</span>
+          <textarea name="details" maxlength="3000" placeholder="Missions, diplôme, compétences indispensables, horaires, lieu de travail…"></textarea>
+        </label>
+        <div class="grille deux">
+          <label class="champ"><span>Entreprise</span><input type="text" name="entreprise" required maxlength="160" autocomplete="organization"></label>
+          <label class="champ"><span>Secteur <small>(facultatif)</small></span><input type="text" name="secteur" maxlength="120" placeholder="Ex. : BTP, commerce, ONG"></label>
+          <label class="champ"><span>Votre nom</span><input type="text" name="contact_nom" required maxlength="120" autocomplete="name"></label>
+          <label class="champ"><span>Votre fonction <small>(facultatif)</small></span><input type="text" name="fonction" maxlength="120" placeholder="Ex. : DRH, gérant(e)"></label>
+          <label class="champ"><span>Téléphone (WhatsApp)</span><input type="tel" name="telephone" required maxlength="40" autocomplete="tel"></label>
+          <label class="champ"><span>Email <small>(facultatif)</small></span><input type="email" name="email" maxlength="160" autocomplete="email"></label>
+          <label class="champ"><span>Ville</span><input type="text" name="ville" maxlength="80" placeholder="Ex. : Cotonou"></label>
+        </div>
+        <label class="piege" aria-hidden="true">Site web <input type="text" name="site_web" tabindex="-1" autocomplete="off"></label>
+        <div class="envoi">
+          <button class="bouton" type="submit" id="bouton-demande">Envoyer ma demande</button>
+          <p class="erreur" id="erreur-demande" role="alert"></p>
+        </div>
+      </form>
+      <div id="demande-envoyee" class="demande-envoyee" hidden tabindex="-1">
+        <h2>Demande reçue, merci.</h2>
+        <p id="texte-envoyee"></p>
+        <p>Nous vous appelons sous 24 h ouvrées pour préciser le besoin et confirmer la formule.</p>
+        <p class="envoi" style="justify-content:flex-start"><a class="bouton secondaire" id="whatsapp-direct" hidden target="_blank" rel="noopener">Nous écrire sur WhatsApp</a></p>
+      </div>
+    </section>
+  </main>
+  <footer class="pied"><a href="espace.html">Espace équipe</a></footer>
+  <script type="module" src="assets/recruter.js?v=6"></script>
+</body>
+</html>

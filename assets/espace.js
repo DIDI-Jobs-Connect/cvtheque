@@ -1,9 +1,9 @@
-import { CONFIG } from "./config.js";
-import { sb, configuree, esc, sansAccents, envoyerCv } from "./client.js?v=5";
+import { CONFIG } from "./config.js?v=6";
+import { sb, configuree, esc, sansAccents, envoyerCv } from "./client.js?v=6";
 import {
   DOMAINES, CONTRATS, NIVEAUX, DISPONIBILITES, STATUTS, ETAPES, STATUTS_DEMANDE, TYPES_ACTIVITE, STATUTS_ENTREPRISE,
   couleurDomaine, libelleStatut, libelleEtape,
-} from "./listes.js?v=5";
+} from "./listes.js?v=6";
 
 const $ = (s) => document.querySelector(s);
 const PAR_PAGE = 40;
@@ -36,7 +36,12 @@ const etat = {
   entreprises: [],
   entrepriseOuverte: null, // { e, contacts, postes, notes, relances }
   selectionPour: null, // poste pour lequel on cherche des profils dans la CVthèque
+  demandesRecues: [], // demandes déposées par les entreprises sur la page « Vous recrutez ? »
 };
+const BASE = new URL("./", location.href).href;
+const DUREE_PARTAGE = 30 * 24 * 3600; // liens de CV du recruteur : 30 jours
+const ETAPES_PRESENTEES = ["presente", "entretien", "offre", "place"];
+const AVIS = { rencontrer: "Veut le/la rencontrer", reserve: "En réserve", non: "Pas retenu" };
 
 document.querySelectorAll(".nom-cvtheque").forEach((n) => (n.textContent = CONFIG.nom));
 
@@ -81,7 +86,7 @@ async function afficherSession(session) {
   }
   $("#email-compte").textContent = session.user.email;
   ecran("appli");
-  await Promise.all([chargerDemandes(), chargerEntreprises()]);
+  await Promise.all([chargerDemandes(), chargerEntreprises(), chargerDemandesRecues()]);
   rendreFiltres();
   changerVue("accueil");
 }
@@ -148,7 +153,7 @@ function changerVue(vue) {
   if (vue === "accueil") return chargerAccueil();
   if (vue === "fiches") return chargerFiches();
   if (vue === "postes") return rendrePostes();
-  if (vue === "entreprises") return rendreEntreprises();
+  if (vue === "entreprises") return chargerDemandesRecues().then(rendreEntreprises);
 }
 
 // =====================================================================
@@ -162,12 +167,13 @@ async function chargerAccueil() {
   ]);
   if (bord.error) {
     console.error(bord.error);
-    $("#contenu").innerHTML = `<div class="vide"><h2>Le module CRM n'est pas encore installé</h2><p>Dans Supabase, ouvrez <b>SQL Editor</b> → <b>New query</b>, collez le contenu du fichier <code>supabase/crm.sql</code> puis cliquez sur <b>Run</b>. Rechargez ensuite cette page.</p></div>`;
+    $("#contenu").innerHTML = `<div class="vide"><h2>Le module CRM n'est pas encore installé</h2><p>Dans Supabase, ouvrez <b>SQL Editor</b> → <b>New query</b>, collez le contenu du fichier <code>supabase/crm.sql</code> puis cliquez sur <b>Run</b>. Faites de même avec <code>supabase/offres.sql</code>. Rechargez ensuite cette page.</p></div>`;
     return;
   }
   etat.bord = bord.data || {};
   etat.relances = relances.data || [];
   etat.derniers = derniers.data || [];
+  majPastille(etat.bord.demandes_entreprises);
   rendreAccueil();
   rendreFiltres();
 }
@@ -214,13 +220,14 @@ function rendreAccueil() {
     </div>
     <div class="tuiles">
       ${tuile(b.actifs, pluriel(b.actifs, "profil dans la CVthèque", "profils dans la CVthèque"), `${b.semaine} ${pluriel(b.semaine, "reçu", "reçus")} cette semaine${evolution ? ` (${evolution > 0 ? "+" : ""}${evolution})` : ""}`, "fiches")}
-      ${tuile(b.postes_ouverts, pluriel(b.postes_ouverts, "poste à pourvoir", "postes à pourvoir"), `${b.entreprises} ${pluriel(b.entreprises, "entreprise active", "entreprises actives")}`, "postes")}
+      ${tuile(b.postes_ouverts, pluriel(b.postes_ouverts, "poste à pourvoir", "postes à pourvoir"), `${b.offres_publiques ?? 0} ${pluriel(b.offres_publiques ?? 0, "publié", "publiés")} en ligne, ${b.entreprises} ${pluriel(b.entreprises, "entreprise active", "entreprises actives")}`, "postes")}
       ${tuile(b.en_cours, pluriel(b.en_cours, "candidat en process", "candidats en process"), "sur les postes ouverts", "postes")}
       ${tuile(b.places_30j, pluriel(b.places_30j, "placement", "placements"), "ces 30 derniers jours", "")}
     </div>
     <div class="bord">
       <section class="panneau">
         <div class="panneau-titre"><h2>À faire</h2>${enRetard.length ? `<span class="tampon retard">${enRetard.length} en retard</span>` : ""}</div>
+        ${alertes()}
         ${etat.relances.length
           ? `<ul class="relances">${etat.relances.map(ligneRelance).join("")}</ul>`
           : `<div class="vide petit"><p>Aucune relance prévue. Ajoutez-en depuis une fiche, un poste ou une entreprise : « rappeler Aïcha jeudi », « envoyer la shortlist au client »…</p></div>`}
@@ -241,6 +248,14 @@ function rendreAccueil() {
       </section>
     </div>`;
   compter();
+}
+
+function alertes() {
+  const b = etat.bord;
+  const lignes = [];
+  if (b.demandes_entreprises) lignes.push(`<li class="relance jour"><span>✦</span><span class="relance-texte"><b>${b.demandes_entreprises} ${pluriel(b.demandes_entreprises, "nouvelle demande d'entreprise", "nouvelles demandes d'entreprises")}</b><span><button type="button" class="lien" data-vue="entreprises">Voir les demandes</button></span></span><span class="relance-date">À traiter</span></li>`);
+  if (b.candidatures_7j) lignes.push(`<li class="relance"><span>✉</span><span class="relance-texte"><b>${b.candidatures_7j} ${pluriel(b.candidatures_7j, "candidature reçue", "candidatures reçues")} sur vos offres</b><span><button type="button" class="lien" data-vue="postes">Voir les postes</button></span></span><span class="relance-date">7 derniers jours</span></li>`);
+  return lignes.length ? `<ul class="relances" style="margin-bottom:.4rem">${lignes.join("")}</ul>` : "";
 }
 
 // Les chiffres montent jusqu'à leur valeur (0,6 s) à l'affichage du tableau de bord.
@@ -687,12 +702,12 @@ function rendrePostes() {
         return `<button type="button" class="demande-carte" data-poste="${d.id}" style="--c:${couleurDomaine(d.domaine)}" aria-current="${ouvert?.d.id === d.id}">
           <b>${esc(d.titre)}</b>
           <small>${esc([d.entreprises?.nom || d.client, d.ville].filter(Boolean).join(", "))}</small>
-          <small>${esc(libelle(STATUTS_DEMANDE, d.statut))}, ${n} ${pluriel(n, "candidat", "candidats")}${places ? `, ${places} ${pluriel(places, "placé", "placés")}` : ""}</small>
+          <small>${esc(libelle(STATUTS_DEMANDE, d.statut))}, ${n} ${pluriel(n, "candidat", "candidats")}${places ? `, ${places} ${pluriel(places, "placé", "placés")}` : ""}${d.publique && d.statut === "ouverte" ? `, <span class="badge-candidature">en ligne</span>` : ""}</small>
         </button>`;
       }).join("")
     : `<div class="vide petit"><h2>Aucun poste</h2><p>Quand une entreprise vous confie un recrutement, créez le poste pour suivre les candidats étape par étape.</p></div>`;
   $("#contenu").innerHTML = `
-    <div class="resume"><h1>Postes à pourvoir</h1><div class="outils"><button type="button" class="bouton petit" data-action="nouveau-poste">Nouveau poste</button></div></div>
+    <div class="resume"><h1>Postes à pourvoir</h1><div class="outils"><a class="bouton discret petit" href="${BASE}offres.html" target="_blank" rel="noopener">Voir la page des offres</a><button type="button" class="bouton petit secondaire" data-action="importer-offre">Coller une offre reçue</button><button type="button" class="bouton petit" data-action="nouveau-poste">Nouveau poste</button></div></div>
     <div class="demandes"><div class="liste-postes">${liste}</div><div id="detail-poste">${ouvert ? "" : `<div class="panneau"><p class="aide">Choisissez un poste pour voir son pipeline, ou créez-en un.</p></div>`}</div></div>`;
   if (ouvert) rendrePipeline();
 }
@@ -703,10 +718,10 @@ async function ouvrirPoste(id) {
   const d = etat.demandes.find((x) => x.id === id);
   if (!d) return;
   const [pipeline, relances] = await Promise.all([
-    sb.from("demande_candidats").select("etape, ajoute_le, modifie_le, candidats(id, prenom, nom, postes, ville, experience, telephone, cv_chemin, domaine, note)").eq("demande_id", id).order("modifie_le", { ascending: false }),
+    sb.from("demande_candidats").select("etape, ajoute_le, modifie_le, origine, avis_recruteur, avis_commentaire, cv_partage, candidats(id, prenom, nom, postes, ville, experience, telephone, cv_chemin, cv_nom, domaine, note)").eq("demande_id", id).order("modifie_le", { ascending: false }),
     sb.from("relances").select("*").eq("demande_id", id).eq("fait", false).order("echeance"),
   ]);
-  if (pipeline.error) return echec(pipeline.error);
+  if (pipeline.error) return echec(pipeline.error, /column|colonne/i.test(pipeline.error.message || "") ? "Base à mettre à jour : exécutez supabase/offres.sql dans Supabase (voir le guide)." : undefined);
   etat.posteOuvert = { d, pipeline: pipeline.data.filter((p) => p.candidats), relances: relances.data || [] };
   rendrePostes();
 }
@@ -720,6 +735,8 @@ function rendrePipeline() {
         <button type="button" class="lien" data-fiche="${c.id}">${esc(c.prenom)} ${esc(c.nom)}</button>
         <small>${esc([c.postes, c.ville, c.experience != null ? `${c.experience} an(s)` : ""].filter(Boolean).join(", "))}</small>
         ${c.note ? `<span class="etoiles">${"★".repeat(c.note)}</span>` : ""}
+        ${p.origine === "candidature" ? `<span class="badge-candidature">A postulé en ligne</span>` : ""}
+        ${p.avis_recruteur ? `<span class="badge-avis ${esc(p.avis_recruteur)}" title="${esc(p.avis_commentaire || "")}">Recruteur : ${esc(AVIS[p.avis_recruteur])}</span>` : ""}
         <label><span class="visuellement-cache">Étape</span><select data-etape="${c.id}" data-demande="${d.id}">${options(ETAPES, null, p.etape)}</select></label>
       </article>`;
   };
@@ -737,6 +754,7 @@ function rendrePipeline() {
         <button type="button" class="bouton discret petit" data-action="relance-poste">Relance</button>
         <button type="button" class="bouton discret petit" data-action="modifier-poste">Modifier</button>
       </div>
+      ${blocPartage(d, pipeline)}
       ${relances.length ? `<div class="relances-poste"><h3>Relances</h3>${listeRelances(relances)}</div>` : ""}
     </div>
     <div class="kanban" aria-label="Pipeline du poste">
@@ -748,6 +766,14 @@ function rendrePipeline() {
         </section>`;
       }).join("")}
     </div>`;
+  $("#publier-poste")?.addEventListener("change", async (e) => {
+    const champs = { publique: e.target.checked };
+    if (e.target.checked && !d.publiee_le) champs.publiee_le = new Date().toISOString();
+    const { error } = await sb.from("demandes").update(champs).eq("id", d.id);
+    if (error) return echec(error);
+    flash(e.target.checked ? "Offre publiée sur la page des offres." : "Offre retirée de la page des offres.");
+    await ouvrirPoste(d.id);
+  });
   $("#statut-poste").addEventListener("change", async (e) => {
     const { error } = await sb.from("demandes").update({ statut: e.target.value }).eq("id", d.id);
     if (error) return echec(error);
@@ -755,6 +781,56 @@ function rendrePipeline() {
     await ouvrirPoste(d.id);
   });
   brancherGlisser();
+}
+
+// ---------- Partage : offre publique et lien privé du recruteur ----------
+const lienOffre = (d) => `${BASE}?offre=${d.id}&source=offre`;
+const lienRecruteur = (d) => `${BASE}recruteur.html#${d.jeton_recruteur}`;
+
+function blocPartage(d, pipeline) {
+  const presentes = pipeline.filter((p) => ETAPES_PRESENTEES.includes(p.etape)).length;
+  const avis = pipeline.filter((p) => p.avis_recruteur).length;
+  const candidatures = pipeline.filter((p) => p.origine === "candidature").length;
+  return `<div class="partage">
+    <div class="partage-ligne">
+      <label class="interrupteur"><input type="checkbox" id="publier-poste"${d.publique ? " checked" : ""}> Publiée sur la page des offres</label>
+      ${d.publique ? `<button type="button" class="bouton discret petit" data-action="copier-lien-offre">Copier le lien pour postuler</button>
+        <a class="bouton discret petit" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(`📢 Offre : ${d.titre}${d.ville ? ` (${d.ville})` : ""}. Postulez avec votre CV ici : ${lienOffre(d)}`)}">Partager sur WhatsApp</a>` : ""}
+      ${candidatures ? `<span class="aide">${candidatures} ${pluriel(candidatures, "candidature en ligne", "candidatures en ligne")}</span>` : ""}
+    </div>
+    <div class="partage-ligne">
+      <b>Lien recruteur</b>
+      ${d.jeton_recruteur
+        ? `<button type="button" class="bouton petit" data-action="copier-lien-recruteur">Copier le lien</button>
+           <button type="button" class="bouton secondaire petit" data-action="whatsapp-recruteur">Envoyer sur WhatsApp</button>
+           <a class="bouton discret petit" target="_blank" rel="noopener" href="${lienRecruteur(d)}">Voir comme le recruteur</a>
+           <button type="button" class="bouton discret petit" data-action="couper-lien">Couper le lien</button>`
+        : `<button type="button" class="bouton secondaire petit" data-action="creer-lien-recruteur">Créer le lien privé</button>`}
+      <span class="aide">${presentes} ${pluriel(presentes, "profil visible", "profils visibles")} (étapes « Présenté au client » et suivantes)${avis ? `, ${avis} ${pluriel(avis, "avis reçu", "avis reçus")}` : ""}</span>
+    </div>
+  </div>`;
+}
+
+/** Prépare les liens de CV (30 jours) des candidats présentés, visibles sur la page du recruteur. */
+async function preparerPartage(demandeId) {
+  const { data, error } = await sb.from("demande_candidats").select("candidat_id, etape, cv_partage, candidats(cv_chemin)").eq("demande_id", demandeId).in("etape", ETAPES_PRESENTEES);
+  if (error) throw error;
+  const aSigner = data.filter((l) => l.candidats?.cv_chemin);
+  if (!aSigner.length) return 0;
+  const { data: liens, error: e2 } = await sb.storage.from("cv").createSignedUrls(aSigner.map((l) => l.candidats.cv_chemin), DUREE_PARTAGE);
+  if (e2) throw e2;
+  const parChemin = Object.fromEntries(liens.map((x) => [x.path, x.signedUrl]));
+  await Promise.all(aSigner.map((l) => sb.from("demande_candidats").update({ cv_partage: parChemin[l.candidats.cv_chemin] || null }).eq("demande_id", demandeId).eq("candidat_id", l.candidat_id)));
+  return aSigner.length;
+}
+
+async function copier(texte, message) {
+  try {
+    await navigator.clipboard.writeText(texte);
+    flash(message);
+  } catch {
+    prompt("Copiez ce lien :", texte);
+  }
 }
 
 // Glisser-déposer des cartes entre colonnes (sur téléphone : la liste « Étape » de chaque carte).
@@ -785,6 +861,9 @@ async function changerEtape(demandeId, candidatId, etape) {
   const { error } = await sb.from("demande_candidats").update({ etape, modifie_le: new Date().toISOString() }).eq("demande_id", demandeId).eq("candidat_id", candidatId);
   if (error) return echec(error);
   if (STATUT_PAR_ETAPE[etape]) await sb.from("candidats").update({ statut: STATUT_PAR_ETAPE[etape], modifie_le: new Date().toISOString() }).eq("id", candidatId);
+  // Le recruteur voit aussitôt le profil (et son CV) sur son lien privé.
+  const poste = etat.demandes.find((x) => x.id === demandeId);
+  if (poste?.jeton_recruteur && ETAPES_PRESENTEES.includes(etape)) await preparerPartage(demandeId).catch(console.error);
   flash(`Étape : ${libelleEtape(etape)}.`);
   if (etat.posteOuvert?.d.id === demandeId && etat.vue === "postes") await ouvrirPoste(demandeId);
   if (etat.ouvert?.c.id === candidatId) await ouvrirFiche(candidatId, false);
@@ -799,8 +878,11 @@ async function ajouterAuPipeline(demandeId, candidatId) {
 
 function ouvrirFormulairePoste(d = null, entrepriseId = null) {
   const v = (k) => esc(d?.[k] ?? "");
+  const edition = Boolean(d?.id);
+  const brouillon = d && !d.id; // offre collée et analysée
   fenetre(`
-    <h2>${d ? "Modifier le poste" : "Nouveau poste à pourvoir"}</h2>
+    <h2>${edition ? "Modifier le poste" : brouillon ? "Vérifiez l'offre analysée" : "Nouveau poste à pourvoir"}</h2>
+    ${brouillon ? `<p class="aide">Les champs ont été remplis à partir du texte collé. Corrigez-les si besoin avant de créer le poste.</p>` : ""}
     <label class="champ"><span>Intitulé du poste</span><input type="text" name="titre" required value="${v("titre")}" placeholder="Ex. : Comptable confirmé(e)"></label>
     <div class="grille deux">
       <label class="champ"><span>Entreprise</span><select name="entreprise_id">${options(etat.entreprises.map((e) => [e.id, e.nom]), "Aucune (à préciser)", d?.entreprise_id ?? entrepriseId)}</select></label>
@@ -812,8 +894,13 @@ function ouvrirFormulairePoste(d = null, entrepriseId = null) {
       <label class="champ"><span>Nombre de postes</span><input type="number" min="1" max="99" name="nb_postes" value="${d?.nb_postes ?? 1}"></label>
       <label class="champ"><span>À pourvoir avant le</span><input type="date" name="echeance" value="${v("echeance")}"></label>
     </div>
-    <label class="champ"><span>Détails du besoin</span><textarea name="details" placeholder="Missions, diplôme, horaires, avantages…">${v("details")}</textarea></label>
-    <p class="aide">Pas encore l'entreprise dans la liste ? Créez-la d'abord dans l'onglet Entreprises.</p>`,
+    <label class="champ"><span>Détails du besoin <small>(visibles par tous si l'offre est publiée : retirez le nom du client si besoin)</small></span><textarea name="details" placeholder="Missions, diplôme, horaires, avantages…">${v("details")}</textarea></label>
+    ${brouillon && d.entreprise_nom && !d.entreprise_id ? `<p class="aide">Entreprise repérée dans le texte : <b>${esc(d.entreprise_nom)}</b>. Elle n'est pas encore dans vos entreprises.</p>` : `<p class="aide">Pas encore l'entreprise dans la liste ? Créez-la d'abord dans l'onglet Entreprises.</p>`}
+    <div class="cases">
+      <label class="case"><input type="checkbox" name="publique"${d?.publique || brouillon ? " checked" : ""}> Publier sur la page des offres (les candidats postulent en ligne)</label>
+      <label class="case"><input type="checkbox" name="afficher_entreprise"${d?.afficher_entreprise ? " checked" : ""}> Afficher le nom de l'entreprise sur l'offre</label>
+      ${edition ? "" : `<label class="case"><input type="checkbox" name="auto"${brouillon || !d ? " checked" : ""}> Ajouter tout de suite les profils compatibles de la CVthèque</label>`}
+    </div>`,
   async (f) => {
     const champs = {
       titre: val(f, "titre"), entreprise_id: val(f, "entreprise_id"), domaine: val(f, "domaine"), ville: val(f, "ville"),
@@ -821,13 +908,21 @@ function ouvrirFormulairePoste(d = null, entrepriseId = null) {
       salaire: val(f, "salaire"), nb_postes: Number(val(f, "nb_postes") || 1), echeance: val(f, "echeance"), details: val(f, "details"),
     };
     if (!champs.titre) return "Indiquez l'intitulé du poste.";
-    const r = d ? await sb.from("demandes").update(champs).eq("id", d.id).select().single() : await sb.from("demandes").insert(champs).select().single();
+    champs.publique = f.get("publique") === "on";
+    champs.afficher_entreprise = f.get("afficher_entreprise") === "on";
+    if (champs.publique && !d?.publiee_le) champs.publiee_le = new Date().toISOString();
+    if (!edition && d?.demande_recue_id) champs.client = d.client ?? null;
+    const r = edition ? await sb.from("demandes").update(champs).eq("id", d.id).select().single() : await sb.from("demandes").insert(champs).select().single();
     if (r.error) throw r.error;
-    flash(d ? "Poste enregistré." : "Poste créé.");
+    if (d?.demande_recue_id) await sb.from("demandes_entreprises").update({ statut: "convertie", demande_id: r.data.id }).eq("id", d.demande_recue_id);
     fermerDossier();
+    let ajoutes = 0;
+    if (!edition && f.get("auto") === "on") ajoutes = await ajouterCompatibles(r.data);
+    flash(edition ? "Poste enregistré." : `Poste créé${champs.publique ? " et publié" : ""}${ajoutes ? `, ${ajoutes} ${pluriel(ajoutes, "profil compatible ajouté", "profils compatibles ajoutés")}` : ""}.`);
+    if (d?.demande_recue_id) await chargerDemandesRecues();
     await ouvrirPoste(r.data.id);
-  }, d ? "Enregistrer" : "Créer le poste",
-  d ? `<button type="button" class="bouton danger" data-action="supprimer-poste" style="margin-right:auto">Supprimer</button>` : "");
+  }, edition ? "Enregistrer" : "Créer le poste",
+  edition ? `<button type="button" class="bouton danger" data-action="supprimer-poste" style="margin-right:auto">Supprimer</button>` : "");
 }
 
 async function copierMessage() {
@@ -859,6 +954,84 @@ async function copierMessage() {
   }
 }
 
+// ---------- Offre collée : analyse automatique ----------
+const VILLES = ["Cotonou", "Porto-Novo", "Abomey-Calavi", "Calavi", "Godomey", "Parakou", "Bohicon", "Abomey", "Ouidah", "Lokossa", "Natitingou", "Djougou", "Kandi", "Malanville", "Allada", "Sèmè-Podji", "Pobè", "Kétou", "Savalou", "Dassa-Zoumè", "Grand-Popo", "Comè", "Aplahoué", "Nikki", "Lomé", "Abidjan", "Dakar", "Ouagadougou", "Niamey", "Lagos"];
+const MOTS_DOMAINES = {
+  "Administration & secrétariat": ["secretaire", "assistante? de direction", "assistante? administrati", "administratif", "receptionniste", "standardiste", "hotesse d'accueil", "agent d'accueil"],
+  "Comptabilité & finance": ["comptab", "financ", "auditeur", "audit", "tresori", "fiscal", "controleur de gestion"],
+  "Banque & assurance": ["banque", "bancaire", "assurance", "microfinance", "agent de credit", "charge de credit"],
+  "Commerce & vente": ["commercial", "vente", "vendeu", "merchandis", "charge de clientele", "teleconseill", "boutique", "prospection", "caissi", "supermarche"],
+  "Marketing & communication": ["marketing", "communication", "community manager", "graphiste", "journalist", "infographiste"],
+  "Informatique & digital": ["informati", "developpeur", "reseau", "data", "logiciel", "web", "devops", "systeme d'information", "cybersecurite"],
+  "Ressources humaines": ["ressources humaines", "\\brh\\b", "recrutement", "paie", "gestionnaire du personnel"],
+  "Juridique": ["juriste", "juridique", "avocat", "notaire", "\\bdroit\\b"],
+  "BTP & génie civil": ["\\bbtp\\b", "genie civil", "conducteur de travaux", "chantier", "macon", "architecte", "topograph"],
+  "Industrie & maintenance": ["maintenance", "mecani", "industri", "electromecan", "production", "usine", "soudeur", "electricien"],
+  "Transport & logistique": ["chauffeur", "logisti", "transport", "magasinier", "livreur", "transit", "douane", "supply"],
+  "Agriculture & agroalimentaire": ["agricul", "agro", "elevage", "agronome", "plantation"],
+  "Santé": ["infirmi", "medecin", "sage-femme", "pharmac", "sante", "laborantin", "aide-soignant", "clinique"],
+  "Éducation & formation": ["enseignant", "professeur", "formateur", "educat", "instituteur", "repetiteur", "ecole"],
+  "Hôtellerie, restauration & tourisme": ["hotel", "cuisini", "serveu", "restaura", "barman", "touris", "chef de cuisine"],
+  "ONG & développement": ["\\bong\\b", "suivi-evaluation", "suivi evaluation", "humanitaire", "developpement communautaire", "bailleur"],
+  "Sécurité & gardiennage": ["securite", "gardien", "vigile"],
+  "Services à la personne": ["menagere", "nounou", "domestique", "baby-sit", "aide a domicile"],
+};
+const CONTRATS_MOTS = [["CDI", /\bcdi\b|duree indeterminee/], ["CDD", /\bcdd\b|duree determinee/], ["Stage", /\bstage|stagiaire/], ["Alternance / apprentissage", /alternance|apprenti/], ["Freelance / mission", /freelance|consultan|prestation|mission ponctuelle/], ["Temps partiel", /temps partiel|mi-temps/], ["Bénévolat", /benevol|volontaire/]];
+
+/** Lit une offre reçue (WhatsApp, email…) et en déduit les champs du poste. */
+function analyserOffre(texte) {
+  const lignes = texte.split(/\r?\n/).map((l) => l.replace(/^[\s*•\-–>#_]+|[\s*_]+$/g, "").trim()).filter(Boolean);
+  const plat = normal(texte);
+  const capture = (re) => { const m = texte.match(re); return m ? m[m.length - 1].trim().replace(/[.;]+$/, "") : null; };
+  let titre = capture(/(?:intitul[ée] du poste|poste(?: à pourvoir)?|fonction|profil recherch[ée])\s*[:\-–]\s*([^\n]{3,90})/i)
+    || capture(/recrute(?:nt)?\s+(?:un|une|des|d['’]un|d['’]une)?\s*\(?\d*\)?\s*([^\n,.]{3,80}?)(?:\s+(?:pour|à|au|en|H\/F|\(H\/F\))\b|[,.\n]|$)/i);
+  if (!titre) titre = lignes.find((l) => l.length <= 90 && !/^(offre|avis|appel)\b.*(emploi|recrutement|candidature)/i.test(normal(l)) && !/^(urgent|recrutement)$/i.test(l)) || lignes[0] || "";
+  titre = titre.replace(/\s*\(?H\s*\/\s*F\)?\s*$/i, "").replace(/^(un|une|des)\s+/i, "").trim();
+  titre = titre.charAt(0).toUpperCase() + titre.slice(1);
+
+  const ville = VILLES.find((v) => new RegExp(`\\b${normal(v).replace("-", "[- ]")}\\b`).test(plat)) || null;
+  const contrat = (CONTRATS_MOTS.find(([, re]) => re.test(plat)) || [null])[0];
+  const exp = plat.match(/experience[^.\n]{0,50}?(\d{1,2})\s*(?:\+\s*)?(?:ans|annees)|(\d{1,2})\s*(?:\+\s*)?(?:ans|annees)[^.\n]{0,30}experience/);
+  const salaire = capture(/(\d[\d\s.]{2,}\s*(?:F\s?CFA|FCFA|XOF|francs?)(?:\s*(?:\/|par)\s*mois)?)/i);
+  const date = texte.match(/(?:avant le|au plus tard le|date limite[^\d\n]{0,30}|jusqu['’]au)\s*(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/i);
+  const nb = plat.match(/\b(\d{1,2})\s*(?:postes|agents|personnes|profils)\b/);
+  const entrepriseNom = capture(/(?:entreprise|soci[ée]t[ée]|cabinet|structure|employeur|client)\s*[:\-–]\s*([^\n]{2,80})/i)
+    || capture(/^\s*(?:la soci[ée]t[ée]|l['’]entreprise|le cabinet|l['’]ONG)?\s*([A-Z][\w&'’ .-]{1,60}?)\s+recrute/m);
+
+  const titreN = normal(titre);
+  let domaine = null, meilleur = 0;
+  for (const [dom, mots] of Object.entries(MOTS_DOMAINES)) {
+    let score = 0;
+    for (const m of mots) {
+      const re = new RegExp(m, "g");
+      score += (titreN.match(re) || []).length * 4 + (plat.match(re) || []).length;
+    }
+    if (score > meilleur) { meilleur = score; domaine = dom; }
+  }
+  const entreprise = entrepriseNom && etat.entreprises.find((e) => normal(e.nom) === normal(entrepriseNom) || normal(entrepriseNom).includes(normal(e.nom)));
+  return {
+    titre: titre.slice(0, 120), ville, contrat, domaine,
+    experience_min: exp ? Number(exp[1] || exp[2]) : null,
+    salaire, nb_postes: nb ? Number(nb[1]) : 1,
+    echeance: date ? `${date[3].length === 2 ? "20" + date[3] : date[3]}-${date[2].padStart(2, "0")}-${date[1].padStart(2, "0")}` : null,
+    details: texte.trim().slice(0, 3000),
+    entreprise_id: entreprise?.id ?? null, entreprise_nom: entrepriseNom,
+  };
+}
+
+function ouvrirImportOffre() {
+  fenetre(`
+    <h2>Coller une offre reçue</h2>
+    <p class="aide">Collez le texte de l'offre tel que vous l'avez reçu (WhatsApp, email, Facebook…). L'outil remplit le poste, le publie sur la page des offres si vous le souhaitez et y ajoute les profils compatibles de la CVthèque.</p>
+    <label class="champ import-offre"><span>Texte de l'offre</span><textarea name="texte" required placeholder="Ex. : La société X recrute un(e) comptable confirmé(e) à Cotonou. CDI. 3 ans d'expérience minimum…"></textarea></label>`,
+  async (f) => {
+    const texte = val(f, "texte");
+    if (!texte || texte.length < 15) return "Collez le texte complet de l'offre.";
+    const brouillon = analyserOffre(texte);
+    setTimeout(() => ouvrirFormulairePoste(brouillon), 0);
+  }, "Analyser l'offre");
+}
+
 // ---------- Matching automatique ----------
 const MOTS_VIDES = new Set(["pour", "avec", "dans", "des", "les", "une", "sur", "confirme", "confirmee", "junior", "senior"]);
 const normal = (t) => sansAccents(String(t || "").toLowerCase());
@@ -887,21 +1060,49 @@ function scorer(c, d) {
   return { score: Math.min(100, score), raisons };
 }
 
-async function matching() {
-  const { d, pipeline } = etat.posteOuvert;
+/** Profils de la CVthèque classés pour un poste (hors candidats déjà dans `exclus`). */
+async function profilsCompatibles(d, exclus = new Set()) {
   const colonnes = "id,prenom,nom,postes,competences,domaine,ville,experience,contrats,disponibilite,note";
   const requetes = [];
   if (d.domaine) requetes.push(sb.from("candidats").select(colonnes).eq("domaine", d.domaine).neq("statut", "archive").limit(400));
   const mots = motsCles(d.titre);
   if (mots.length) requetes.push(sb.from("candidats").select(colonnes).neq("statut", "archive").textSearch("recherche", mots.join(" or "), { type: "websearch", config: "french" }).limit(300));
-  if (!requetes.length) return flash("Indiquez au moins le domaine ou l'intitulé du poste.", true);
+  if (!requetes.length) return null;
   const resultats = await Promise.all(requetes);
   const erreur = resultats.find((r) => r.error);
-  if (erreur) return echec(erreur.error, "Recherche des profils impossible.");
-  const deja = new Set(pipeline.map((p) => p.candidats.id));
+  if (erreur) throw erreur.error;
   const vus = new Map();
-  for (const r of resultats) for (const c of r.data) if (!deja.has(c.id)) vus.set(c.id, c);
-  const classes = [...vus.values()].map((c) => ({ c, ...scorer(c, d) })).sort((a, b) => b.score - a.score || (b.c.note || 0) - (a.c.note || 0)).slice(0, 25);
+  for (const r of resultats) for (const c of r.data) if (!exclus.has(c.id)) vus.set(c.id, c);
+  return [...vus.values()].map((c) => ({ c, ...scorer(c, d) })).sort((a, b) => b.score - a.score || (b.c.note || 0) - (a.c.note || 0));
+}
+
+/** Ajoute au pipeline (étape « Sourcé ») les meilleurs profils : score de 60 ou plus, 10 au maximum. */
+async function ajouterCompatibles(d) {
+  try {
+    const liste = (await profilsCompatibles(d)) || [];
+    const retenus = liste.filter((x) => x.score >= 60).slice(0, 10);
+    if (!retenus.length) return 0;
+    const { error } = await sb.from("demande_candidats").upsert(
+      retenus.map((x) => ({ demande_id: d.id, candidat_id: x.c.id, etape: "source", origine: "matching" })),
+      { onConflict: "demande_id,candidat_id", ignoreDuplicates: true });
+    if (error) throw error;
+    return retenus.length;
+  } catch (err) {
+    console.error(err);
+    return 0;
+  }
+}
+
+async function matching() {
+  const { d, pipeline } = etat.posteOuvert;
+  let liste;
+  try {
+    liste = await profilsCompatibles(d, new Set(pipeline.map((p) => p.candidats.id)));
+  } catch (err) {
+    return echec(err, "Recherche des profils impossible.");
+  }
+  if (!liste) return flash("Indiquez au moins le domaine ou l'intitulé du poste.", true);
+  const classes = liste.slice(0, 25);
   $("#contenu-large").innerHTML = `
     <div class="large-tete"><h2>Profils compatibles : ${esc(d.titre)}</h2><button type="button" class="bouton discret petit" data-action="fermer-large">Fermer</button></div>
     <p class="aide">Classement selon le domaine, l'intitulé du poste, la ville, l'expérience, le contrat et la disponibilité. Les candidats déjà dans le pipeline n'apparaissent pas.</p>
@@ -922,6 +1123,67 @@ async function chargerEntreprises() {
   if (!error) etat.entreprises = data;
 }
 
+// ---------- Demandes reçues des entreprises (page « Vous recrutez ? ») ----------
+async function chargerDemandesRecues() {
+  const { data, error } = await sb.from("demandes_entreprises").select("*").in("statut", ["nouvelle", "contactee"]).order("cree_le", { ascending: false }).limit(50);
+  etat.demandesRecues = error ? [] : data;
+  majPastille(etat.demandesRecues.filter((d) => d.statut === "nouvelle").length);
+}
+
+function majPastille(n) {
+  const bouton = document.querySelector('.vues button[data-vue="entreprises"]');
+  if (!bouton) return;
+  bouton.querySelector(".pastille")?.remove();
+  if (n) bouton.insertAdjacentHTML("beforeend", `<span class="pastille" aria-label="${n} nouvelles demandes">${n}</span>`);
+}
+
+function blocDemandesRecues() {
+  if (!etat.demandesRecues.length) return "";
+  return `<section class="panneau" style="margin-bottom:1.25rem">
+    <div class="panneau-titre"><h2>Demandes reçues</h2><span class="aide">depuis la page « Vous recrutez ? »</span></div>
+    <div class="demandes-recues" style="margin-top:.8rem">${etat.demandesRecues.map((r) => {
+      const wa = numeroWhatsapp(r.telephone);
+      const infos = [r.nb_postes > 1 ? `${r.nb_postes} postes` : "", r.contrat, r.experience_min != null ? `${r.experience_min} an(s) d'exp.` : "", r.budget, r.ville, r.echeance ? `avant le ${jour(r.echeance)}` : ""].filter(Boolean);
+      return `<article class="demande-recue ${esc(r.statut)}">
+        <div class="demande-recue-tete"><b>${esc(r.poste)}</b><span>${esc(r.entreprise)}${r.secteur ? `, ${esc(r.secteur)}` : ""}</span>
+          <span class="tampon ${r.statut === "nouvelle" ? "nouveau" : "qualifie"}">${r.statut === "nouvelle" ? "Nouvelle" : "Contactée"}</span>
+          <span class="aide">reçue le ${jour(r.cree_le)}</span></div>
+        <p class="aide">Formule : <b>${esc(r.formule || "non précisée")}</b>${infos.length ? ` · ${esc(infos.join(", "))}` : ""}</p>
+        <p class="aide">Contact : ${esc(r.contact_nom)}${r.fonction ? ` (${esc(r.fonction)})` : ""}, ${esc(r.telephone)}${r.email ? `, ${esc(r.email)}` : ""}</p>
+        ${r.details ? `<p class="details-poste" style="margin-top:.2rem">${esc(r.details)}</p>` : ""}
+        <div class="envoi">
+          <button type="button" class="bouton petit" data-convertir="${r.id}">Créer le poste</button>
+          ${wa ? `<a class="bouton secondaire petit" target="_blank" rel="noopener" href="https://wa.me/${wa}?text=${encodeURIComponent(`Bonjour ${r.contact_nom}, ici ${CONFIG.organisation || "l'équipe recrutement"}. Merci pour votre demande de profils pour le poste « ${r.poste} ». `)}">WhatsApp</a>` : ""}
+          <a class="bouton discret petit" href="tel:${esc(String(r.telephone).replace(/[^\d+]/g, ""))}">Appeler</a>
+          ${r.statut === "nouvelle" ? `<button type="button" class="bouton discret petit" data-recue-statut="contactee" data-recue="${r.id}">Marquer contactée</button>` : ""}
+          <button type="button" class="bouton discret petit" data-recue-statut="refusee" data-recue="${r.id}">Classer sans suite</button>
+        </div>
+      </article>`;
+    }).join("")}</div>
+  </section>`;
+}
+
+/** Transforme une demande reçue en entreprise (créée si besoin), contact et poste pré-rempli. */
+async function convertirDemande(id) {
+  const r = etat.demandesRecues.find((x) => x.id === id);
+  if (!r) return;
+  let entreprise = etat.entreprises.find((e) => normal(e.nom) === normal(r.entreprise));
+  if (!entreprise) {
+    const { data, error } = await sb.from("entreprises").insert({ nom: r.entreprise, secteur: r.secteur, ville: r.ville, statut: "prospect", notes: r.formule ? `Formule demandée : ${r.formule}` : null }).select().single();
+    if (error) return echec(error);
+    entreprise = data;
+    await sb.from("contacts").insert({ entreprise_id: data.id, nom: r.contact_nom, fonction: r.fonction, telephone: r.telephone, email: r.email });
+    await chargerEntreprises();
+  }
+  ouvrirFormulairePoste({
+    titre: r.poste, entreprise_id: entreprise.id, ville: r.ville, contrat: CONTRATS.includes(r.contrat) ? r.contrat : null,
+    experience_min: r.experience_min, salaire: r.budget, nb_postes: r.nb_postes, echeance: r.echeance,
+    details: [r.formule ? `Formule : ${r.formule}` : "", r.details].filter(Boolean).join("\n\n"),
+    domaine: analyserOffre(`${r.poste}\n${r.details || ""}`).domaine,
+    demande_recue_id: r.id,
+  });
+}
+
 function rendreEntreprises() {
   const ouverte = etat.entrepriseOuverte;
   const liste = etat.entreprises.length
@@ -931,7 +1193,8 @@ function rendreEntreprises() {
       </button>`).join("")
     : `<div class="vide petit"><h2>Aucune entreprise</h2><p>Ajoutez les entreprises qui vous confient des recrutements, et leurs contacts.</p></div>`;
   $("#contenu").innerHTML = `
-    <div class="resume"><h1>Entreprises</h1><div class="outils"><button type="button" class="bouton petit" data-action="nouvelle-entreprise">Nouvelle entreprise</button></div></div>
+    <div class="resume"><h1>Entreprises</h1><div class="outils"><a class="bouton discret petit" href="${BASE}recruter.html" target="_blank" rel="noopener">Voir la page « Vous recrutez ? »</a><button type="button" class="bouton petit" data-action="nouvelle-entreprise">Nouvelle entreprise</button></div></div>
+    ${blocDemandesRecues()}
     <div class="demandes"><div class="liste-postes">${liste}</div><div id="detail-entreprise">${ouverte ? "" : `<div class="panneau"><p class="aide">Choisissez une entreprise pour voir ses contacts, ses postes et l'historique des échanges.</p></div>`}</div></div>`;
   if (ouverte) rendreEntreprise();
 }
@@ -1108,6 +1371,15 @@ document.addEventListener("click", async (e) => {
     cible.closest("li").remove();
     return ouvrirPoste(etat.posteOuvert.d.id);
   }
+  if (ds.convertir) return convertirDemande(ds.convertir);
+  if (ds.recue) {
+    if (ds.recueStatut === "refusee" && !confirm("Classer cette demande sans suite ?")) return;
+    const { error } = await sb.from("demandes_entreprises").update({ statut: ds.recueStatut }).eq("id", ds.recue);
+    if (error) return echec(error);
+    await chargerDemandesRecues();
+    rendreEntreprises();
+    return flash(ds.recueStatut === "contactee" ? "Demande marquée contactée." : "Demande classée.");
+  }
   if (ds.supprimerContact) {
     if (!confirm("Retirer ce contact ?")) return;
     const { error } = await sb.from("contacts").delete().eq("id", ds.supprimerContact);
@@ -1165,6 +1437,34 @@ document.addEventListener("click", async (e) => {
       return flash("Poste supprimé.");
     }
     case "matching": return matching();
+    case "importer-offre": return ouvrirImportOffre();
+    case "copier-lien-offre": return copier(lienOffre(etat.posteOuvert.d), "Lien copié : les candidats arrivent directement sur ce poste.");
+    case "creer-lien-recruteur": {
+      const d = etat.posteOuvert.d;
+      const { error } = await sb.from("demandes").update({ jeton_recruteur: crypto.randomUUID(), jeton_cree_le: new Date().toISOString() }).eq("id", d.id);
+      if (error) return echec(error);
+      await preparerPartage(d.id).catch(console.error);
+      await ouvrirPoste(d.id);
+      return copier(lienRecruteur(etat.posteOuvert.d), "Lien recruteur créé et copié.");
+    }
+    case "copier-lien-recruteur":
+      await preparerPartage(etat.posteOuvert.d.id).catch(console.error);
+      return copier(lienRecruteur(etat.posteOuvert.d), "Lien recruteur copié. Les liens des CV sont valables 30 jours.");
+    case "whatsapp-recruteur": {
+      const d = etat.posteOuvert.d;
+      await preparerPartage(d.id).catch(console.error);
+      const n = etat.posteOuvert.pipeline.filter((p) => ETAPES_PRESENTEES.includes(p.etape)).length;
+      const texte = `Bonjour, voici ${n ? `les ${n} profils sélectionnés` : "votre espace de suivi des profils"} pour le poste « ${d.titre} ». Vous pouvez ouvrir les CV et me donner votre avis sur chaque candidat ici : ${lienRecruteur(d)}`;
+      return window.open(`https://wa.me/?text=${encodeURIComponent(texte)}`, "_blank", "noopener");
+    }
+    case "couper-lien": {
+      const d = etat.posteOuvert.d;
+      if (!confirm("Couper le lien recruteur ? La personne qui l'a reçu ne verra plus les profils. Vous pourrez en créer un nouveau.")) return;
+      const { error } = await sb.from("demandes").update({ jeton_recruteur: null }).eq("id", d.id);
+      if (error) return echec(error);
+      flash("Lien coupé.");
+      return ouvrirPoste(d.id);
+    }
     case "copier-message": return copierMessage();
     case "chercher-profils": {
       const d = etat.posteOuvert.d;
