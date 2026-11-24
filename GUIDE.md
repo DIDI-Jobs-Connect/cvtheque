@@ -130,6 +130,22 @@ Le mot après `?source=` apparaît dans chaque fiche (« Provenance ») : vous s
 - **Suppression** : si une personne demande le retrait de ses données, ouvrez sa fiche →
   **Supprimer définitivement** (la fiche et ses CV sont effacés).
 
+## Transférer les candidats du site principal
+
+Les candidats inscrits sur le site DIDI Jobs Connect qui ont coché « figurer dans la CVthèque »
+peuvent être copiés ici, avec leur CV. Les autres ne sont pas transférés (pas d'accord).
+
+1. Dépôt GitHub de la CVthèque → **Settings** → **Secrets and variables** → **Actions** →
+   **New repository secret**, deux fois :
+   - `SITE_DATABASE_URL` : l'adresse de la base du site (Netlify → projet → **Database** →
+     connection string, elle commence par `postgresql://`) ;
+   - `SUPABASE_SERVICE_ROLE_KEY` : Supabase → **Project Settings** → **API Keys** → clé
+     **secret** (ou `service_role`).
+2. Onglet **Actions** → « Transférer les candidats du site vers la CVthèque » → **Run workflow**
+   avec « oui » (simulation) : le résultat donne les chiffres, sans rien écrire.
+3. Relancez avec « non » pour transférer. Relançable sans risque : pas de doublon.
+4. Ensuite, supprimez les deux secrets (Settings → Secrets) par prudence.
+
 ## Limites de l'offre gratuite Supabase
 
 - 1 Go de fichiers, soit environ 3 000 à 5 000 CV, et 500 Mo de base de données (des dizaines de
