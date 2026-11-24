@@ -7,14 +7,19 @@
   <meta name="description" content="Déposez votre CV dans notre CVthèque : nous vous contactons quand un poste correspond à votre profil.">
   <meta property="og:title" content="Déposez votre CV dans notre CVthèque">
   <meta property="og:description" content="Nous vous contactons quand un recruteur cherche votre profil.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='9' width='26' height='19' rx='3' fill='%23285c4d'/%3E%3Crect x='5' y='4' width='12' height='7' rx='2' fill='%23d4a03a'/%3E%3C/svg%3E">
+  <meta property="og:image" content="assets/brand/logo.png">
+  <meta name="theme-color" content="#4263f0">
+  <link rel="icon" href="assets/brand/icon.png">
+  <link rel="apple-touch-icon" href="assets/brand/icon.png">
   <link rel="stylesheet" href="assets/styles.css">
+  <script>document.documentElement.classList.add("js")</script>
 </head>
 <body>
+  <div class="progression" aria-hidden="true"><i id="progression"></i></div>
   <main class="depot">
     <header class="marque">
-      <strong id="nom-cvtheque">CVthèque</strong>
-      <span id="organisation"></span>
+      <a class="logo" href="./"><img src="assets/brand/logo.png" alt="Didi Job Connect" width="99" height="46"></a>
+      <span class="badge-cvtheque" id="nom-cvtheque">CVthèque</span>
     </header>
 
     <div id="config-manquante" class="config-manquante" hidden>
@@ -24,7 +29,14 @@
 
     <div id="zone-formulaire">
       <section class="entete-depot">
-        <h1>Laissez votre CV, on vous appelle quand un poste vous correspond.</h1>
+        <img class="loupe-fond" src="assets/brand/icon.png" alt="">
+        <h1>
+          <span class="visuellement-cache">Laissez votre CV, on vous appelle quand un poste vous correspond.</span>
+          <span aria-hidden="true" style="--l:0">Laissez votre CV.</span>
+          <span aria-hidden="true" style="--l:1">On vous appelle quand un poste de</span>
+          <span aria-hidden="true" style="--l:2" class="metier"><span class="metier-mot" id="metier">comptable</span><i class="metier-trait" id="metier-trait"></i></span>
+          <span aria-hidden="true" style="--l:3">vous correspond.</span>
+        </h1>
         <p>Votre dossier est classé dans notre CVthèque. Seule notre équipe de recrutement le consulte, et nous ne le transmettons à un recruteur qu'avec votre accord.</p>
       </section>
 
@@ -33,6 +45,7 @@
           <legend><span class="etape-titre"><b>1</b><h2>Ce que vous cherchez</h2></span></legend>
           <p class="champ"><span id="titre-domaine">Votre domaine</span></p>
           <div class="classeur" id="domaines" role="radiogroup" aria-labelledby="titre-domaine"></div>
+          <p class="choix-domaine" id="choix-domaine" aria-live="polite"></p>
           <div class="grille">
             <label class="champ"><span>Poste(s) recherché(s)</span>
               <input type="text" name="postes" required maxlength="300" placeholder="Ex. : comptable, aide-comptable">
@@ -82,6 +95,7 @@
               <b>Votre CV</b>
               <span class="aide">PDF ou Word, 5 Mo maximum.</span>
               <input type="file" name="cv" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required>
+              <span class="fichier-choisi" id="fichier-choisi" aria-live="polite"></span>
             </label>
           </div>
           <label class="piege" aria-hidden="true">Site web <input type="text" name="site_web" tabindex="-1" autocomplete="off"></label>
@@ -98,16 +112,23 @@
     </div>
 
     <section id="confirmation" class="classe" hidden tabindex="-1">
-      <div class="chemise" id="chemise-classee">
-        <span class="onglet"></span>
-        <div class="corps">
-          <h2 id="confirmation-titre">Votre CV est classé.</h2>
-          <p id="confirmation-texte"></p>
-          <p>Gardez votre téléphone joignable : nous vous appelons ou vous écrivons sur WhatsApp dès qu'un recruteur cherche votre profil.</p>
-          <div class="envoi">
-            <button class="bouton" type="button" id="partager">Partager ce formulaire</button>
-            <a class="bouton secondaire" id="lien-chaine" hidden target="_blank" rel="noopener">Rejoindre la chaîne WhatsApp</a>
-          </div>
+      <div class="scene" aria-hidden="true">
+        <div class="scene-dossier" id="scene-dossier">
+          <span class="scene-onglet"></span>
+          <span class="scene-arriere"></span>
+          <span class="scene-feuille"><i></i><i></i><i></i><i></i></span>
+          <span class="scene-avant"></span>
+          <span class="scene-tampon"><img src="assets/brand/icon.png" alt="">Classé</span>
+        </div>
+        <div class="confettis" id="confettis"></div>
+      </div>
+      <div class="carte-merci">
+        <h2 id="confirmation-titre">Votre CV est classé.</h2>
+        <p id="confirmation-texte"></p>
+        <p>Gardez votre téléphone joignable : nous vous appelons ou vous écrivons sur WhatsApp dès qu'un recruteur cherche votre profil.</p>
+        <div class="envoi">
+          <button class="bouton" type="button" id="partager">Partager ce formulaire</button>
+          <a class="bouton secondaire" id="lien-chaine" hidden target="_blank" rel="noopener">Rejoindre la chaîne WhatsApp</a>
         </div>
       </div>
     </section>

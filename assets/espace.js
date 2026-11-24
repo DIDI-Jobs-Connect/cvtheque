@@ -164,10 +164,13 @@ async function chargerFiches() {
   if (error) return echec(error, "Impossible de charger les fiches.");
   etat.fiches = data;
   etat.total = count ?? data.length;
+  etat.cascade = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   rendreFiches();
+  etat.cascade = false;
+  compter();
 }
 
-function ligneFiche(c) {
+function ligneFiche(c, i = 0) {
   const details = [
     c.ville,
     c.experience != null ? `${c.experience} an${c.experience > 1 ? "s" : ""} d'expérience` : "",
@@ -175,7 +178,7 @@ function ligneFiche(c) {
     (c.contrats || []).join(", "),
     c.disponibilite ? `Dispo. ${c.disponibilite.toLowerCase()}` : "",
   ].filter(Boolean);
-  return `<button type="button" class="fiche" data-fiche="${c.id}" style="--c:${couleurDomaine(c.domaine)}" aria-current="${etat.ouvert?.c.id === c.id}">
+  return `<button type="button" class="fiche" data-fiche="${c.id}" style="--c:${couleurDomaine(c.domaine)};--i:${i}" aria-current="${etat.ouvert?.c.id === c.id}">
       <span><span class="qui">${esc(c.prenom)} ${esc(c.nom)}</span><br><span class="poste">${esc(c.postes)}</span></span>
       <span class="cote"><span class="tampon ${esc(c.statut)}">${esc(libelleStatut(c.statut))}</span>${c.note ? `<span class="etoiles" aria-label="${c.note} sur 5">${"★".repeat(c.note)}</span>` : ""}</span>
       <span class="details">${details.map((d) => `<span>${esc(d)}</span>`).join("")}<span class="date">Reçu le ${jour(c.cree_le)}</span></span>
@@ -187,7 +190,7 @@ function rendreFiches() {
   const filtresActifs = Object.values(etat.filtres).some(Boolean) || etat.texte;
   const pages = Math.max(1, Math.ceil(etat.total / PAR_PAGE));
   const liste = etat.fiches.length
-    ? `<div class="fiches">${etat.fiches.map(ligneFiche).join("")}</div>`
+    ? `<div class="fiches${etat.cascade ? " cascade" : ""}">${etat.fiches.map(ligneFiche).join("")}</div>`
     : filtresActifs
       ? `<div class="vide"><h2>Aucune fiche ne correspond</h2><p>Retirez un filtre ou essayez d'autres mots, par exemple le poste sans le lieu.</p></div>`
       : `<div class="vide"><h2>La CVthèque est vide pour l'instant</h2><p>Partagez le lien du formulaire de dépôt sur votre chaîne, ou ajoutez une fiche vous-même avec « Ajouter une fiche ».</p></div>`;
@@ -196,9 +199,9 @@ function rendreFiches() {
     <div class="resume">
       <h1>${filtresActifs ? `${etat.total} fiche${etat.total > 1 ? "s" : ""} trouvée${etat.total > 1 ? "s" : ""}` : "Fiches"}</h1>
       <div class="chiffres">
-        <span><b>${s.total ?? "–"}</b> ${pluriel(s.total, "profil actif", "profils actifs")}</span>
-        <span><b>${s.semaine ?? "–"}</b> ${pluriel(s.semaine, "reçu", "reçus")} cette semaine</span>
-        <span><b>${s.demandes ?? "–"}</b> ${pluriel(s.demandes, "demande ouverte", "demandes ouvertes")}</span>
+        <span><b data-compte="${s.total ?? ""}">${s.total ?? "–"}</b> ${pluriel(s.total, "profil actif", "profils actifs")}</span>
+        <span><b data-compte="${s.semaine ?? ""}">${s.semaine ?? "–"}</b> ${pluriel(s.semaine, "reçu", "reçus")} cette semaine</span>
+        <span><b data-compte="${s.demandes ?? ""}">${s.demandes ?? "–"}</b> ${pluriel(s.demandes, "demande ouverte", "demandes ouvertes")}</span>
       </div>
       <div class="outils">
         <label><span class="visuellement-cache">Trier</span>
@@ -219,6 +222,24 @@ function rendreFiches() {
     etat.tri = e.target.value;
     etat.page = 0;
     chargerFiches();
+  });
+}
+
+// Les chiffres du résumé montent jusqu'à leur valeur au premier affichage (0,6 s).
+let dejaCompte = false;
+function compter() {
+  if (dejaCompte || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  dejaCompte = true;
+  document.querySelectorAll("[data-compte]").forEach((b) => {
+    const cible = Number(b.dataset.compte);
+    if (!cible) return;
+    const debut = performance.now();
+    const pas = (t) => {
+      const x = Math.min(1, (t - debut) / 600);
+      b.textContent = Math.round(cible * (1 - Math.pow(1 - x, 3)));
+      if (x < 1) requestAnimationFrame(pas);
+    };
+    requestAnimationFrame(pas);
   });
 }
 

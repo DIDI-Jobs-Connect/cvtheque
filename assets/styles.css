@@ -1,20 +1,27 @@
-/* CVthèque : un classeur de dossiers suspendus. Chaque domaine a son onglet de couleur,
-   c'est le seul élément décoratif ; tout le reste reste sobre. */
-@import url("https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,650;12..96,800&display=swap");
+/* CVthèque DIDI Jobs Connect : un classeur de dossiers suspendus aux couleurs de la charte
+   (bleu Didi, encre, ambre). Chaque domaine a son onglet de couleur. */
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&family=Poppins:wght@500;600;700;800&display=swap");
 
 :root {
-  --fond: #e9ede6;
-  --papier: #fbfbf7;
-  --encre: #16202a;
-  --encre-2: #4a5661;
-  --trait: #cad1c6;
-  --action: #285c4d;
-  --action-fonce: #1c4438;
-  --tampon: #a8353f;
-  --ok: #2f7a4f;
-  --rayon: 10px;
-  --titre: "Bricolage Grotesque", "Trebuchet MS", sans-serif;
-  --texte: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --fond: #f3f5fb;
+  --papier: #ffffff;
+  --encre: #0b1026;
+  --encre-2: #5a6280;
+  --trait: #e3e7f2;
+  --action: #4263f0;
+  --action-fonce: #2b44c0;
+  --ambre: #ff9f1c;
+  --tampon: #c2343f;
+  --ok: #1f8a55;
+  --rayon: 12px;
+  --titre: "Poppins", "Segoe UI", sans-serif;
+  --texte: "Manrope", "Segoe UI", system-ui, sans-serif;
+  /* Mouvement : une courbe signature, trois durées. */
+  --courbe: cubic-bezier(0.2, 0, 0, 1);
+  --courbe-rebond: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --vite: 200ms;
+  --normal: 300ms;
+  --lent: 450ms;
   color-scheme: light;
 }
 
@@ -79,7 +86,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--action); outline
   display: flex; align-items: flex-end; min-height: 78px; padding: 0.7rem 0.8rem;
   border-radius: 3px var(--rayon) var(--rayon) var(--rayon); border-top: 4px solid var(--c);
   background: color-mix(in srgb, var(--c) 16%, var(--papier));
-  font: 650 0.98rem/1.2 var(--titre);
+  font: 600 0.98rem/1.2 var(--titre);
   transition: transform 160ms ease, box-shadow 160ms ease;
 }
 .chemise:hover .corps { transform: translateY(-3px); }
@@ -181,7 +188,7 @@ fieldset { border: 0; margin: 0; min-width: 0; }
 }
 .fiche:hover { border-color: var(--encre-2); }
 .fiche[aria-current="true"] { border-color: var(--encre); box-shadow: inset 4px 0 0 var(--c); }
-.fiche .qui { font: 650 1.05rem var(--titre); }
+.fiche .qui { font: 600 1.05rem var(--titre); }
 .fiche .poste { color: var(--encre); }
 .fiche .details { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; color: var(--encre-2); font-size: 0.88rem; }
 .fiche .cote { display: grid; justify-items: end; gap: 0.35rem; }
@@ -206,7 +213,7 @@ fieldset { border: 0; margin: 0; min-width: 0; }
 /* Dossier ouvert (panneau de droite) */
 .dossier {
   position: fixed; top: 0; right: 0; bottom: 0; z-index: 20; width: min(620px, 100%); overflow-y: auto;
-  background: var(--papier); border-left: 1px solid var(--trait); box-shadow: -12px 0 40px rgba(22, 32, 42, 0.14);
+  background: var(--papier); border-left: 1px solid var(--trait); box-shadow: -12px 0 40px rgba(11, 16, 38, 0.14);
 }
 .dossier .tete { position: sticky; top: 0; z-index: 1; padding: 1rem 1.25rem; background: var(--papier); border-bottom: 1px solid var(--trait); border-top: 6px solid var(--c); }
 .dossier .tete-ligne { display: flex; align-items: flex-start; gap: 0.75rem; }
@@ -249,7 +256,7 @@ fieldset { border: 0; margin: 0; min-width: 0; }
 
 /* Fenêtres */
 dialog { width: min(720px, calc(100% - 2rem)); max-height: calc(100% - 2rem); padding: 0; border: 0; border-radius: var(--rayon); background: var(--papier); color: var(--encre); }
-dialog::backdrop { background: rgba(22, 32, 42, 0.45); }
+dialog::backdrop { background: rgba(11, 16, 38, 0.45); }
 dialog form { display: grid; gap: 1rem; padding: 1.5rem; }
 dialog h2 { font-size: 1.4rem; font-weight: 800; }
 dialog .envoi { margin-top: 0.25rem; justify-content: flex-end; }
@@ -257,7 +264,7 @@ dialog .envoi { margin-top: 0.25rem; justify-content: flex-end; }
 .message-flash {
   position: fixed; left: 50%; bottom: 1.25rem; z-index: 50; transform: translateX(-50%);
   padding: 0.7rem 1.1rem; border-radius: 8px; background: var(--encre); color: #fff; font-weight: 700;
-  box-shadow: 0 8px 24px rgba(22, 32, 42, 0.25);
+  box-shadow: 0 8px 24px rgba(11, 16, 38, 0.25);
 }
 .message-flash.erreur { background: var(--tampon); }
 .config-manquante { max-width: 640px; margin: 3rem auto; padding: 1.5rem; border-radius: var(--rayon); background: var(--papier); border: 2px solid var(--tampon); }
@@ -268,7 +275,7 @@ dialog .envoi { margin-top: 0.25rem; justify-content: flex-end; }
   .corps-appli { grid-template-columns: 1fr; }
   .filtres {
     position: fixed; inset: 0 auto 0 0; z-index: 15; width: min(320px, 88%); overflow-y: auto;
-    background: var(--papier); box-shadow: 12px 0 40px rgba(22, 32, 42, 0.2); transform: translateX(-105%);
+    background: var(--papier); box-shadow: 12px 0 40px rgba(11, 16, 38, 0.2); transform: translateX(-105%);
     transition: transform 200ms ease;
   }
   .filtres.ouvert { transform: none; }
@@ -300,4 +307,154 @@ dialog .envoi { margin-top: 0.25rem; justify-content: flex-end; }
   .dossier { top: 62px; width: min(560px, 42vw); box-shadow: none; }
   .dossier .tete { border-top-width: 4px; }
   body.dossier-ouvert .corps-appli { padding-right: min(560px, 42vw); }
+}
+
+/* =====================================================================
+   Identité DIDI Jobs Connect : logo, barre bleu-ambre, mouvement
+   ===================================================================== */
+.marque .logo img { display: block; height: 46px; width: auto; }
+.badge-cvtheque {
+  display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.8rem; border-radius: 999px;
+  background: var(--encre); color: #fff; font: 600 0.85rem var(--titre);
+}
+.marque .badge-cvtheque { color: #fff; }
+.badge-cvtheque::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ambre); }
+.barre-marque { height: 6px; width: 120px; border-radius: 3px; background: linear-gradient(90deg, var(--action) 70%, var(--ambre) 70%); }
+
+/* Titre : le métier change, chacun sur sa propre ligne pour ne rien faire bouger d'autre. */
+.entete-depot { position: relative; }
+.entete-depot h1 span { display: block; }
+.metier { position: relative; height: 1.2em; overflow: hidden; color: var(--action); }
+.metier-mot { position: absolute; left: 0; top: 0; white-space: nowrap; }
+.metier-mot.sort { animation: mot-sort var(--vite) cubic-bezier(0.3, 0, 1, 1) both; }
+.metier-mot.entre { animation: mot-entre var(--normal) var(--courbe) both; }
+.metier-trait {
+  position: absolute; left: 0; bottom: 0.02em; height: 0.12em; width: var(--largeur, 4ch); border-radius: 0.06em;
+  background: linear-gradient(90deg, var(--action) 70%, var(--ambre) 70%); transform-origin: left;
+  transition: width var(--normal) var(--courbe);
+}
+.metier-trait.trace { animation: trait 380ms var(--courbe) 100ms both; }
+@keyframes mot-sort { to { transform: translateY(-70%); opacity: 0; } }
+@keyframes mot-entre { from { transform: translateY(70%); opacity: 0; } }
+@keyframes trait { from { transform: scaleX(0); } }
+
+/* Loupe du logo en fond du titre : vie ambiante très discrète. */
+.loupe-fond {
+  position: absolute; right: -10px; top: -20px; width: 220px; opacity: 0.1; pointer-events: none;
+  animation: flotte 6s ease-in-out infinite;
+}
+@keyframes flotte { 50% { transform: translateY(-12px) rotate(-4deg); } }
+
+/* Chargement : une seule séquence orchestrée (titre, texte, puis les dossiers en cascade). */
+.js .entete-depot h1 > span:not(.visuellement-cache) { animation: monte var(--lent) var(--courbe) both; animation-delay: calc(var(--l, 0) * 80ms); }
+.js .entete-depot p { animation: monte var(--lent) var(--courbe) 320ms both; }
+.js .classeur .chemise { animation: monte var(--normal) var(--courbe) both; animation-delay: calc(420ms + var(--i, 0) * 22ms); }
+@keyframes monte { from { opacity: 0; transform: translateY(18px); } }
+
+/* Étapes : apparaissent quand on y arrive. */
+.js .etape.attend { opacity: 0; transform: translateY(24px); }
+.js .etape { transition: opacity var(--lent) var(--courbe), transform var(--lent) var(--courbe); }
+
+/* Dossier choisi : il saute légèrement, l'onglet suit 60 ms plus tard. */
+.chemise.saute .corps { animation: saute var(--normal) var(--courbe-rebond); }
+.chemise.saute .onglet { animation: saute var(--normal) var(--courbe-rebond) 60ms; }
+@keyframes saute { 0% { transform: translateY(-8px) scale(1); } 40% { transform: translateY(-12px) scale(1.04); } 100% { transform: translateY(-8px) scale(1); } }
+.choix-domaine { margin: -0.6rem 0 1.3rem; color: var(--ok); font-weight: 700; min-height: 1.5em; }
+.choix-domaine:not(:empty) { animation: monte var(--vite) var(--courbe); }
+
+/* Barre de progression du formulaire. */
+.progression { position: fixed; top: 0; left: 0; right: 0; z-index: 30; height: 5px; background: transparent; }
+.progression i {
+  display: block; height: 100%; transform-origin: left; transform: scaleX(var(--p, 0));
+  background: linear-gradient(90deg, var(--action), var(--ambre)); transition: transform var(--normal) var(--courbe);
+}
+
+/* Fichier du CV */
+.fichier { transition: border-color var(--vite) var(--courbe), background var(--vite) var(--courbe); }
+.fichier.survol, .fichier.rempli { border-style: solid; border-color: var(--action); background: color-mix(in srgb, var(--action) 5%, #fff); }
+.fichier-choisi { display: flex; align-items: center; gap: 0.6rem; font-weight: 700; color: var(--encre); }
+.fichier-choisi:not(:empty) { animation: monte var(--normal) var(--courbe); }
+.fichier-choisi .feuille-mini { width: 22px; height: 28px; border-radius: 3px; background: #fff; border: 2px solid var(--action); position: relative; flex: none; }
+.fichier-choisi .feuille-mini::after { content: ""; position: absolute; left: 4px; right: 4px; top: 7px; height: 2px; background: var(--ambre); box-shadow: 0 5px 0 var(--trait), 0 10px 0 var(--trait); }
+
+/* Erreur : secousse courte, sans rebond. */
+.secoue { animation: secoue 360ms ease-in-out; }
+@keyframes secoue { 20% { transform: translateX(-10px); } 45% { transform: translateX(8px); } 70% { transform: translateX(-5px); } 90% { transform: translateX(2px); } }
+
+/* Envoi en cours */
+.bouton.charge::before {
+  content: ""; width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff; animation: tourne 900ms linear infinite;
+}
+@keyframes tourne { to { transform: rotate(360deg); } }
+.bouton { transition: background var(--vite) var(--courbe), transform 120ms var(--courbe); }
+.bouton:active { transform: scale(0.97); }
+
+/* Moment fort : le CV glisse dans son dossier, la loupe DIDI le tamponne « Classé ». */
+.scene { position: relative; height: 230px; max-width: 320px; margin: 0 auto 0.5rem; }
+.scene-dossier { position: absolute; left: 50%; bottom: 10px; width: 220px; height: 150px; margin-left: -110px; animation: apparait var(--normal) var(--courbe) both; }
+.scene-onglet { position: absolute; left: 14px; top: -16px; width: 92px; height: 22px; border-radius: 8px 8px 0 0; background: var(--c); }
+.scene-arriere { position: absolute; inset: 0; border-radius: 4px 12px 12px 12px; background: color-mix(in srgb, var(--c) 55%, #fff); }
+.scene-feuille {
+  position: absolute; left: 30px; right: 30px; top: -70px; height: 150px; border-radius: 6px; background: #fff;
+  box-shadow: 0 6px 18px rgba(11, 16, 38, 0.15); padding: 18px 16px; display: grid; align-content: start; gap: 9px;
+  animation: glisse 520ms cubic-bezier(0.3, 0, 0.2, 1.15) 150ms both;
+}
+.scene-feuille i { display: block; height: 7px; border-radius: 4px; background: var(--trait); }
+.scene-feuille i:first-child { width: 60%; background: var(--action); }
+.scene-feuille i:nth-child(2) { width: 85%; }
+.scene-avant {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 96px; border-radius: 4px 4px 12px 12px; background: var(--c);
+  transform-origin: bottom; animation: referme var(--normal) var(--courbe) 560ms both;
+}
+.scene-tampon {
+  position: absolute; right: -14px; bottom: 26px; display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.3rem 0.7rem 0.3rem 0.35rem; border: 3px solid var(--ok); border-radius: 8px; background: #fff;
+  color: var(--ok); font: 800 1.05rem var(--titre); transform: rotate(-8deg);
+  animation: tamponne 300ms var(--courbe-rebond) 820ms both;
+}
+.scene-tampon img { width: 26px; height: 26px; }
+@keyframes apparait { from { opacity: 0; transform: scale(0.9); } }
+@keyframes glisse { from { transform: translateY(-90px); opacity: 0; } 30% { opacity: 1; } to { transform: translateY(30px); } }
+@keyframes referme { from { transform: perspective(500px) rotateX(55deg); } }
+@keyframes tamponne { from { opacity: 0; transform: rotate(-8deg) scale(1.6); } }
+.confettis { position: absolute; left: 50%; top: 45%; pointer-events: none; }
+.confettis span {
+  position: absolute; width: 9px; height: 14px; border-radius: 2px; background: var(--couleur); opacity: 0;
+  animation: confetti 950ms cubic-bezier(0.1, 0.6, 0.3, 1) both; animation-delay: calc(860ms + var(--d) * 1ms);
+}
+@keyframes confetti {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--x), var(--y)) rotate(var(--r)); }
+}
+.carte-merci { text-align: center; padding: 1.5rem; border-radius: var(--rayon); background: var(--papier); border: 1px solid var(--trait); animation: monte var(--normal) var(--courbe) 1000ms both; }
+.carte-merci h2 { font-size: clamp(1.5rem, 5vw, 2rem); margin-bottom: 0.6rem; }
+.carte-merci p { color: var(--encre-2); }
+.carte-merci p + p { margin-top: 0.5rem; }
+.carte-merci .envoi { justify-content: center; }
+
+/* Espace équipe : mouvement sobre et fonctionnel. */
+.barre .logo-mini { height: 30px; width: auto; display: block; }
+.connexion .logo-connexion { height: 54px; width: auto; }
+.fiches.cascade .fiche { animation: monte var(--normal) var(--courbe) both; animation-delay: calc(min(var(--i, 0), 10) * 30ms); }
+.fiche { transition: border-color var(--vite) var(--courbe), transform var(--vite) var(--courbe), box-shadow var(--vite) var(--courbe); }
+.fiche:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(11, 16, 38, 0.08); }
+.dossier:not([hidden]) { animation: entre-droite var(--normal) var(--courbe); }
+@keyframes entre-droite { from { opacity: 0; transform: translateX(28px); } }
+dialog[open] { animation: apparait var(--normal) var(--courbe); }
+.message-flash:not([hidden]) { animation: flash-monte var(--normal) var(--courbe); }
+@keyframes flash-monte { from { opacity: 0; transform: translate(-50%, 14px); } }
+.onglets-domaines button { transition: background var(--vite) var(--courbe); }
+.note-etoiles button { transition: transform 120ms var(--courbe), color var(--vite); }
+.note-etoiles button:active { transform: scale(1.25); }
+
+@media (max-width: 520px) {
+  .loupe-fond { width: 120px; top: -6px; right: -16px; }
+  .marque .logo img { height: 38px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .js .etape.attend { opacity: 1; transform: none; }
+  .loupe-fond { animation: none; }
+  .confettis { display: none; }
 }
