@@ -754,3 +754,5 @@ dialog.large { width: min(860px, calc(100% - 2rem)); }
 .hero.court .hero-contenu { max-width: 980px; }
 .page-publique > section:first-child > .titre-section { color: #fff; text-shadow: 0 2px 14px rgba(11, 16, 38, 0.7); }
 .poste-tete .details-poste { max-height: 9.5em; overflow: auto; padding-right: 0.5rem; }
+.relance-cv li.faite { opacity: 0.55; }
+.relance-cv li.faite .bouton { background: var(--ok); }

@@ -1,0 +1,39 @@
+name: Relancer par email les candidats sans CV
+
+on:
+  workflow_dispatch:
+    inputs:
+      essai:
+        description: "Simulation seulement (oui = compter sans envoyer, non = envoyer les emails)"
+        required: true
+        default: "oui"
+        type: choice
+        options: ["oui", "non"]
+      maximum:
+        description: "Nombre maximum d'emails pour ce lancement (offre gratuite Resend : 100 par jour)"
+        required: true
+        default: "90"
+
+permissions:
+  contents: read
+
+jobs:
+  relancer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Installer les outils
+        run: npm install --no-save --no-audit --no-fund @supabase/supabase-js@2.117.3
+      - name: Relancer
+        env:
+          SUPABASE_URL: https://orgnclnbwrmsuluntmrr.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          ESSAI: ${{ inputs.essai }}
+          MAXIMUM: ${{ inputs.maximum }}
+        run: node scripts/relance-email.mjs

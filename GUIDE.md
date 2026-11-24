@@ -146,6 +146,17 @@ peuvent être copiés ici, avec leur CV. Les autres ne sont pas transférés (pa
 3. Relancez avec « non » pour transférer. Relançable sans risque : pas de doublon.
 4. Ensuite, supprimez les deux secrets (Settings → Secrets) par prudence.
 
+## Relancer les candidats sans CV
+
+- **WhatsApp** : espace équipe → **Candidats** → **Relancer les CV manquants**. Chaque bouton ouvre
+  WhatsApp avec un message déjà écrit au prénom de la personne ; la fiche est ensuite marquée
+  « relancée » pour ne pas l'envoyer deux fois.
+- **Email automatique** : ajoutez les secrets `RESEND_API_KEY` et `EMAIL_FROM` (mêmes valeurs que
+  sur Netlify) et `SUPABASE_SERVICE_ROLE_KEY`, puis **Actions** → « Relancer par email les candidats
+  sans CV » → **Run workflow** (« oui » = simulation, « non » = envoi). Chaque personne ne reçoit
+  l'email qu'une fois. L'offre gratuite de Resend permet 100 emails par jour : relancez le lendemain
+  s'il en reste.
+
 ## Limites de l'offre gratuite Supabase
 
 - 1 Go de fichiers, soit environ 3 000 à 5 000 CV, et 500 Mo de base de données (des dizaines de

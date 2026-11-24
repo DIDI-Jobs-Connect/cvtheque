@@ -203,7 +203,7 @@ function barres(objet, libeller = (k) => k, couleur = () => "var(--action)") {
   return `<ul class="barres">${lignes.map(([k, n]) => `<li><span>${esc(libeller(k))}</span><i style="--w:${(n / max) * 100}%;--c:${couleur(k)}"></i><b>${n}</b></li>`).join("")}</ul>`;
 }
 
-const SOURCES = { chaine: "Chaîne WhatsApp", accompagnement: "Accompagnement", formulaire: "Formulaire", statut: "Statut WhatsApp", linkedin: "LinkedIn", facebook: "Facebook", "ajout par l'équipe": "Ajout manuel", inconnue: "Inconnue" };
+const SOURCES = { chaine: "Chaîne WhatsApp", accompagnement: "Accompagnement", formulaire: "Formulaire", statut: "Statut WhatsApp", linkedin: "LinkedIn", facebook: "Facebook", "ajout par l'équipe": "Ajout manuel", inconnue: "Inconnue", site: "Site DIDI Jobs Connect", offre: "Candidature à une offre", "relance-site": "Relance des inscrits", "relance-email": "Relance par email", "relance-whatsapp": "Relance WhatsApp", "chaine-relance": "Relance chaîne WhatsApp" };
 
 function rendreAccueil() {
   const b = etat.bord;
@@ -416,6 +416,7 @@ function rendreFiches() {
             ${[["recent", "Plus récents"], ["experience", "Plus expérimentés"], ["note", "Mieux notés"], ["nom", "Nom (A-Z)"]].map(([k, l]) => `<option value="${k}"${etat.tri === k ? " selected" : ""}>${l}</option>`).join("")}
           </select>
         </label>
+        <button type="button" class="bouton secondaire petit" data-action="relance-cv">Relancer les CV manquants</button>
         <button type="button" class="bouton discret petit" data-action="exporter">Exporter (Excel)</button>
       </div>
     </div>
@@ -665,6 +666,41 @@ function ouvrirFormulaireFiche(c = null) {
     if (etat.vue === "fiches") await chargerFiches();
     await ouvrirFiche(id);
   }, c ? "Enregistrer" : "Ajouter le candidat");
+}
+
+// ---------- Relance WhatsApp des fiches sans CV ----------
+const MARQUE_WA = "Relance CV envoyée par WhatsApp";
+const LIEN_RELANCE = `${BASE}?source=relance-whatsapp`;
+
+async function ouvrirRelanceCv() {
+  const cibles = [];
+  for (let debut = 0; ; debut += 1000) {
+    const { data, error } = await sb.from("candidats").select("id, prenom, nom, telephone, postes, domaine, source").is("cv_chemin", null).neq("statut", "archive").not("telephone", "is", null).order("cree_le", { ascending: false }).range(debut, debut + 999);
+    if (error) return echec(error);
+    cibles.push(...data);
+    if (data.length < 1000) break;
+  }
+  const { data: notes } = await sb.from("notes").select("candidat_id").eq("texte", MARQUE_WA);
+  const faits = new Set((notes || []).map((n) => n.candidat_id));
+  const restants = cibles.filter((c) => !faits.has(c.id) && numeroWhatsapp(c.telephone));
+  const message = (c) => `Bonjour ${c.prenom}, ici ${CONFIG.organisation || "l'équipe recrutement"} 👋\nVotre profil est dans notre CVthèque, mais il manque votre CV. Les entreprises nous demandent des profils chaque semaine et nous proposons en priorité les dossiers complets.\nAjoutez-le en 3 minutes ici (avec le même numéro, votre fiche sera complétée) : ${LIEN_RELANCE}`;
+  $("#contenu-large").innerHTML = `
+    <div class="large-tete"><h2>Relancer les CV manquants</h2><button type="button" class="bouton discret petit" data-action="fermer-large">Fermer</button></div>
+    <p class="aide">${cibles.length} ${pluriel(cibles.length, "fiche", "fiches")} sans CV avec un téléphone. ${faits.size ? `${cibles.length - restants.length} déjà ${pluriel(cibles.length - restants.length, "relancée", "relancées")} sur WhatsApp. ` : ""}Cliquez sur « WhatsApp » : le message s'ouvre déjà écrit, il ne reste qu'à appuyer sur Envoyer. La fiche est ensuite marquée comme relancée.</p>
+    ${restants.length ? `<ol class="matchs relance-cv">${restants.map((c) => `<li style="--c:${couleurDomaine(c.domaine)}">
+        <span class="match-qui"><button type="button" class="lien" data-fiche="${c.id}">${esc(c.prenom)} ${esc(c.nom)}</button><small>${esc(c.postes)}${c.source ? ` · ${esc(SOURCES[c.source] || c.source)}` : ""}</small></span>
+        <span></span>
+        <a class="bouton petit" target="_blank" rel="noopener" data-action="relance-wa" data-id="${c.id}" href="https://wa.me/${numeroWhatsapp(c.telephone)}?text=${encodeURIComponent(message(c))}">WhatsApp</a>
+      </li>`).join("")}</ol>` : `<div class="vide petit"><p>Toutes les fiches sans CV ont été relancées. 🎉</p></div>`}`;
+  $("#fenetre-large").showModal();
+}
+
+async function marquerRelanceWa(lien) {
+  const li = lien.closest("li");
+  li?.classList.add("faite");
+  lien.textContent = "Relancé ✓";
+  const { error } = await sb.from("notes").insert({ candidat_id: lien.dataset.id, type: "whatsapp", texte: MARQUE_WA });
+  if (error) echec(error, "La relance n'a pas été notée sur la fiche.");
 }
 
 // ---------- Export Excel (CSV) ----------
@@ -1410,6 +1446,8 @@ document.addEventListener("click", async (e) => {
     case "supprimer": return supprimerFiche();
     case "nouvelle-fiche": return ouvrirFormulaireFiche();
     case "exporter": return exporter();
+    case "relance-cv": return ouvrirRelanceCv();
+    case "relance-wa": return marquerRelanceWa(cible);
     case "nouvelle-relance": return ouvrirFormulaireRelance();
     case "relance-candidat": return ouvrirFormulaireRelance({ candidat: etat.ouvert.c });
     case "relance-poste": return ouvrirFormulaireRelance({ poste: etat.posteOuvert.d });
