@@ -13,6 +13,7 @@
 import pg from "pg";
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
+import { appendFileSync } from "node:fs";
 
 const nettoyer = (v) => (v || "").trim().replace(/^["']|["']$/g, "").trim();
 const SITE_DATABASE_URL = nettoyer(process.env.SITE_DATABASE_URL);
@@ -104,6 +105,7 @@ const { rows: totaux } = await site.query(`
    where u.role = 'CANDIDATE' and u."isActive"`);
 console.log(`Candidats actifs sur le site : ${totaux[0].candidats}, dont ${totaux[0].accord} ont accepté la CVthèque.`);
 
+const totalSite = totaux[0];
 const { rows } = await site.query(`
   select u.id, u.name, u.email, u.phone, p.city, p.zone, p.field, p.diploma, p.specialty, p."educationLevel",
          p."experienceLevel", p.skills, p.availability, p.headline, p."isStudent", p.school, p."updatedAt",
@@ -190,4 +192,23 @@ console.log(`  déjà dans la CVthèque avec un CV : ${bilan.dejaPresents}`);
 console.log(`  sans CV téléversé sur le site : ${bilan.sansCv}`);
 console.log(`  CV ignorés (format non PDF/Word ou plus de 5 Mo) : ${bilan.cvIgnore}`);
 console.log(`  erreurs : ${bilan.erreurs}`);
+// Bilan en grand sur la page « Summary » de GitHub.
+const resume = [
+  `## ${ESSAI ? "Simulation (rien n'a été écrit)" : "Transfert terminé"}`,
+  "",
+  `**Candidats actifs sur le site : ${totalSite.candidats}**, dont **${totalSite.accord}** ont accepté la CVthèque (les autres ne sont pas transférés).`,
+  "",
+  "| | Nombre |",
+  "| --- | ---: |",
+  `| ${ESSAI ? "Seraient ajoutés" : "Ajoutés"} à la CVthèque | **${bilan.nouveaux}** |`,
+  `| CV ${ESSAI ? "qui seraient ajoutés" : "ajoutés"} à une fiche existante | ${bilan.cvAjoute} |`,
+  `| Déjà dans la CVthèque avec un CV | ${bilan.dejaPresents} |`,
+  `| Sans CV téléversé sur le site | ${bilan.sansCv} |`,
+  `| CV ignorés (pas PDF/Word, ou plus de 5 Mo) | ${bilan.cvIgnore} |`,
+  `| Erreurs | ${bilan.erreurs} |`,
+  "",
+  ESSAI ? "Pour transférer pour de vrai : **Run workflow** avec « non »." : "Les candidats apparaissent dans l'espace équipe avec la provenance « Site ».",
+].join("\n");
+if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, resume + "\n");
+if (process.env.GITHUB_ACTIONS) console.log(`::notice title=${ESSAI ? "Simulation" : "Transfert"}::${totalSite.accord} candidats avec accord sur ${totalSite.candidats}. ${ESSAI ? "Seraient ajoutés" : "Ajoutés"} : ${bilan.nouveaux}. CV ajoutés à des fiches existantes : ${bilan.cvAjoute}. Déjà présents : ${bilan.dejaPresents}. Erreurs : ${bilan.erreurs}.`);
 if (bilan.erreurs) process.exitCode = 1;
