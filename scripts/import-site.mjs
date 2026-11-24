@@ -14,7 +14,10 @@ import pg from "pg";
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 
-const { SITE_DATABASE_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env;
+const nettoyer = (v) => (v || "").trim().replace(/^["']|["']$/g, "").trim();
+const SITE_DATABASE_URL = nettoyer(process.env.SITE_DATABASE_URL);
+const SUPABASE_URL = nettoyer(process.env.SUPABASE_URL);
+const SUPABASE_SERVICE_ROLE_KEY = nettoyer(process.env.SUPABASE_SERVICE_ROLE_KEY);
 // Sur GitHub, les erreurs s'affichent aussi en haut de la page du résumé.
 const erreurInitiale = console.error;
 console.error = (...m) => erreurInitiale(process.env.GITHUB_ACTIONS ? "::error::" + m.join(" ") : m.join(" "));
@@ -66,6 +69,25 @@ function extension(f) {
 
 const site = new pg.Client({ connectionString: SITE_DATABASE_URL, ssl: /localhost|127\.0\.0\.1/.test(SITE_DATABASE_URL) ? false : { rejectUnauthorized: false } });
 const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+
+// Vérification de la clé Supabase avant de commencer.
+{
+  const { error } = await sb.from("candidats").select("id", { head: true, count: "exact" });
+  if (error) {
+    const cle = SUPABASE_SERVICE_ROLE_KEY;
+    const genre = cle.startsWith("sb_publishable_") ? "une clé « publishable » (publique)"
+      : cle.startsWith("sb_secret_") ? "une clé « secret »"
+      : cle.startsWith("eyJ") ? "une clé de type « anon » ou « service_role »"
+      : "une valeur qui ne ressemble pas à une clé Supabase";
+    console.error(`Clé Supabase refusée (${error.message}). Le secret SUPABASE_SERVICE_ROLE_KEY contient ${genre}, de ${cle.length} caractères.`);
+    console.error("Il faut la clé « secret » (sb_secret_…) ou « service_role » (eyJ…, environ 200 caractères) du projet CVthèque : Supabase → Project Settings → API Keys.");
+    process.exit(1);
+  }
+  if (SUPABASE_SERVICE_ROLE_KEY.startsWith("sb_publishable_") || SUPABASE_SERVICE_ROLE_KEY.length < 40) {
+    console.error("Le secret SUPABASE_SERVICE_ROLE_KEY contient la clé publique : prenez la clé « secret » ou « service_role ».");
+    process.exit(1);
+  }
+}
 
 try {
   await site.connect();
