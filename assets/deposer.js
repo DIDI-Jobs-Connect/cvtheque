@@ -180,6 +180,7 @@ form.addEventListener("submit", async (e) => {
 
 function confirmer(d, resultat) {
   $("#zone-formulaire").hidden = true;
+  $("#accroche").hidden = true;
   const bloc = $("#confirmation");
   bloc.hidden = false;
   $(".progression").hidden = true;

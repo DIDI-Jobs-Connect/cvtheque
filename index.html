@@ -16,20 +16,13 @@
 </head>
 <body>
   <div class="progression" aria-hidden="true"><i id="progression"></i></div>
-  <main class="depot">
-    <header class="marque">
-      <a class="logo" href="./"><img src="assets/brand/logo.png" alt="Didi Job Connect" width="99" height="46"></a>
-      <span class="badge-cvtheque" id="nom-cvtheque">CVthèque</span>
-    </header>
-
-    <div id="config-manquante" class="config-manquante" hidden>
-      <h2>CVthèque pas encore reliée</h2>
-      <p>Renseignez l'adresse et la clé Supabase dans <code>assets/config.js</code> (voir le guide).</p>
-    </div>
-
-    <div id="zone-formulaire">
-      <section class="entete-depot">
-        <img class="loupe-fond" src="assets/brand/icon.png" alt="">
+  <header class="hero">
+    <div class="hero-contenu">
+      <div class="marque">
+        <a class="logo" href="./"><img src="assets/brand/logo-white.png" alt="Didi Job Connect" width="99" height="46"></a>
+        <span class="badge-cvtheque" id="nom-cvtheque">CVthèque</span>
+      </div>
+      <section class="entete-depot" id="accroche">
         <h1>
           <span class="visuellement-cache">Laissez votre CV, on vous appelle quand un poste vous correspond.</span>
           <span aria-hidden="true" style="--l:0">Laissez votre CV.</span>
@@ -39,6 +32,15 @@
         </h1>
         <p>Votre dossier est classé dans notre CVthèque. Seule notre équipe de recrutement le consulte, et nous ne le transmettons à un recruteur qu'avec votre accord.</p>
       </section>
+    </div>
+  </header>
+  <main class="depot">
+    <div id="config-manquante" class="config-manquante" hidden>
+      <h2>CVthèque pas encore reliée</h2>
+      <p>Renseignez l'adresse et la clé Supabase dans <code>assets/config.js</code> (voir le guide).</p>
+    </div>
+
+    <div id="zone-formulaire">
 
       <form id="depot" novalidate>
         <fieldset class="etape">

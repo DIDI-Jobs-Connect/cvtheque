@@ -458,3 +458,38 @@ dialog[open] { animation: apparait var(--normal) var(--courbe); }
   .loupe-fond { animation: none; }
   .confettis { display: none; }
 }
+
+/* Bandeau d'accueil : photo d'équipe sous un voile bleu nuit DIDI. */
+.hero {
+  position: relative; overflow: hidden; isolation: isolate; color: #fff; background: var(--encre);
+  padding: 1.25rem 1rem 7rem;
+}
+.hero::before {
+  content: ""; position: absolute; inset: 0; z-index: -2;
+  background: url("images/equipe.jpg") 70% 30% / cover no-repeat;
+  animation: zoom-lent 24s ease-in-out infinite alternate;
+}
+.hero::after {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background:
+    linear-gradient(90deg, rgba(11, 16, 38, 0.94) 0%, rgba(11, 16, 38, 0.82) 48%, rgba(11, 16, 38, 0.45) 100%),
+    linear-gradient(0deg, rgba(66, 99, 240, 0.35), transparent 45%);
+}
+@keyframes zoom-lent { from { transform: scale(1.08); } to { transform: scale(1); } }
+.hero-contenu { max-width: 880px; margin: 0 auto; }
+.hero .marque { padding-bottom: 2.5rem; }
+.hero .badge-cvtheque { background: rgba(255, 255, 255, 0.14); border: 1px solid rgba(255, 255, 255, 0.25); backdrop-filter: blur(6px); }
+.hero h1 { color: #fff; text-shadow: 0 2px 24px rgba(11, 16, 38, 0.5); }
+.hero .metier { color: var(--ambre); }
+.hero .entete-depot p { color: rgba(255, 255, 255, 0.86); }
+/* Le formulaire chevauche le bas de la photo, comme une feuille posée dessus. */
+.depot { position: relative; margin-top: -5rem; padding-top: 0; }
+.depot > #zone-formulaire > form > .etape:first-child { margin-top: 0; box-shadow: 0 18px 50px rgba(11, 16, 38, 0.18); }
+.classe { margin-top: 0; }
+.scene { background: var(--papier); border-radius: var(--rayon); max-width: none; box-shadow: 0 18px 50px rgba(11, 16, 38, 0.18); }
+@media (max-width: 640px) {
+  .hero { padding-bottom: 6rem; }
+  .hero::before { background-position: 78% center; }
+  .hero::after { background: linear-gradient(180deg, rgba(11, 16, 38, 0.8), rgba(11, 16, 38, 0.92)), linear-gradient(0deg, rgba(66, 99, 240, 0.3), transparent 50%); }
+}
+@media (prefers-reduced-motion: reduce) { .hero::before { animation: none; } }
