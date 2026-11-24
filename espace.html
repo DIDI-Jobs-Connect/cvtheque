@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
-  <title>CVthèque · espace équipe</title>
+  <title>CVthèque, espace recruteur</title>
   <link rel="icon" href="assets/brand/icon.png">
   <meta name="theme-color" content="#4263f0">
-  <link rel="stylesheet" href="assets/styles.css?v=4">
+  <link rel="stylesheet" href="assets/styles.css?v=5">
 </head>
 <body>
   <div id="config-manquante" class="config-manquante" hidden>
@@ -20,7 +20,7 @@
       <img class="logo-connexion" src="assets/brand/logo.png?v=4" alt="Didi Job Connect" width="116" height="54">
       <div class="barre-marque"></div>
       <h1 class="nom-cvtheque">CVthèque</h1>
-      <p class="aide">Espace réservé à l'équipe de recrutement.</p>
+      <p class="aide">Espace recruteur : candidats, postes, entreprises et relances.</p>
       <label class="champ"><span>Email</span><input type="email" name="email" required autocomplete="username"></label>
       <label class="champ"><span>Mot de passe</span><input type="password" name="mdp" required autocomplete="current-password"></label>
       <button class="bouton" type="submit">Se connecter</button>
@@ -42,8 +42,10 @@
       <img class="logo-mini" src="assets/brand/icon.png" alt="" width="30" height="30">
       <span class="nom nom-cvtheque">CVthèque</span>
       <nav class="vues" aria-label="Vues">
-        <button type="button" data-vue="fiches" aria-current="page">Fiches</button>
-        <button type="button" data-vue="demandes">Demandes</button>
+        <button type="button" data-vue="accueil" aria-current="page">Tableau de bord</button>
+        <button type="button" data-vue="fiches">Candidats</button>
+        <button type="button" data-vue="postes">Postes</button>
+        <button type="button" data-vue="entreprises">Entreprises</button>
       </nav>
       <label class="recherche"><span class="visuellement-cache">Rechercher</span>
         <input type="search" id="recherche" placeholder="Rechercher : comptable Cotonou, Sage, anglais…" autocomplete="off">
@@ -62,10 +64,10 @@
 
   <aside class="dossier" id="dossier" hidden aria-label="Dossier du candidat"></aside>
 
-  <dialog id="fenetre-fiche"><form id="form-fiche" method="dialog" novalidate></form></dialog>
-  <dialog id="fenetre-demande"><form id="form-demande" method="dialog" novalidate></form></dialog>
+  <dialog id="fenetre"><form id="form-fenetre" method="dialog" novalidate></form></dialog>
+  <dialog id="fenetre-large" class="large"><div id="contenu-large"></div></dialog>
   <div id="flash" class="message-flash" role="status" hidden></div>
 
-  <script type="module" src="assets/espace.js?v=4"></script>
+  <script type="module" src="assets/espace.js?v=5"></script>
 </body>
 </html>

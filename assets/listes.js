@@ -35,10 +35,29 @@ export const STATUTS = [
   ["archive", "Archivé"],
 ];
 export const libelleStatut = (s) => (STATUTS.find(([k]) => k === s) || [s, s])[1];
+// Étapes du pipeline d'un candidat sur un poste, dans l'ordre du processus.
 export const ETAPES = [
-  ["propose", "Proposé"],
-  ["retenu", "Retenu"],
+  ["source", "Sourcé"],
+  ["contacte", "Contacté"],
+  ["presente", "Présenté au client"],
+  ["entretien", "Entretien"],
+  ["offre", "Offre"],
+  ["place", "Placé"],
   ["refuse", "Non retenu"],
+];
+export const libelleEtape = (e) => (ETAPES.find(([k]) => k === e) || [e, e])[1];
+export const TYPES_ACTIVITE = [
+  ["appel", "Appel"],
+  ["whatsapp", "WhatsApp"],
+  ["email", "Email"],
+  ["entretien", "Entretien"],
+  ["rencontre", "Rencontre"],
+  ["note", "Note"],
+];
+export const STATUTS_ENTREPRISE = [
+  ["client", "Client"],
+  ["prospect", "Prospect"],
+  ["inactif", "Inactif"],
 ];
 export const STATUTS_DEMANDE = [
   ["ouverte", "Ouverte"],

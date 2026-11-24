@@ -1,30 +1,41 @@
 import { CONFIG } from "./config.js";
-import { sb, configuree, esc, sansAccents, envoyerCv } from "./client.js";
+import { sb, configuree, esc, sansAccents, envoyerCv } from "./client.js?v=5";
 import {
-  DOMAINES, CONTRATS, NIVEAUX, DISPONIBILITES, STATUTS, ETAPES, STATUTS_DEMANDE,
-  couleurDomaine, libelleStatut,
-} from "./listes.js";
+  DOMAINES, CONTRATS, NIVEAUX, DISPONIBILITES, STATUTS, ETAPES, STATUTS_DEMANDE, TYPES_ACTIVITE, STATUTS_ENTREPRISE,
+  couleurDomaine, libelleStatut, libelleEtape,
+} from "./listes.js?v=5";
 
 const $ = (s) => document.querySelector(s);
 const PAR_PAGE = 40;
-const COLONNES_LISTE = "id,cree_le,prenom,nom,telephone,email,ville,postes,domaine,contrats,niveau,experience,disponibilite,statut,note,cv_chemin";
+const COLONNES_LISTE = "id,cree_le,prenom,nom,telephone,email,ville,postes,domaine,contrats,niveau,experience,disponibilite,statut,note,cv_chemin,source";
 const dateFr = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric" });
+const jourCourt = new Intl.DateTimeFormat("fr-FR", { weekday: "short", day: "numeric", month: "short" });
 const jour = (d) => (d ? dateFr.format(new Date(d)) : "");
 const pluriel = (n, un, plusieurs) => (n > 1 ? plusieurs : un);
+const aujourdhui = () => new Date().toISOString().slice(0, 10);
+const reduit = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const libelle = (liste, k) => (liste.find(([c]) => c === k) || [k, k])[1];
+// Statut de la fiche candidat suivant l'étape atteinte sur un poste.
+const STATUT_PAR_ETAPE = { presente: "propose", entretien: "entretien", offre: "entretien", place: "place" };
 
 const etat = {
-  vue: "fiches",
+  vue: "accueil",
   filtres: { domaine: "", statut: "", contrat: "", niveau: "", experience: "", ville: "", disponibilite: "" },
   texte: "",
   tri: "recent",
   page: 0,
   total: 0,
   fiches: [],
-  stats: null,
-  ouvert: null, // dossier affiché : { c, notes, liens }
+  cascade: false,
+  bord: null, // chiffres du tableau de bord
+  relances: [],
+  derniers: [],
+  ouvert: null, // dossier candidat : { c, notes, liens, relances }
   demandes: [],
-  demandeOuverte: null, // { d, propositions }
-  selectionPour: null, // demande pour laquelle on cherche des profils
+  posteOuvert: null, // { d, pipeline, relances }
+  entreprises: [],
+  entrepriseOuverte: null, // { e, contacts, postes, notes, relances }
+  selectionPour: null, // poste pour lequel on cherche des profils dans la CVthèque
 };
 
 document.querySelectorAll(".nom-cvtheque").forEach((n) => (n.textContent = CONFIG.nom));
@@ -56,7 +67,7 @@ async function demarrer() {
   }
   const { data } = await sb.auth.getSession();
   await afficherSession(data.session);
-  sb.auth.onAuthStateChange((evenement, session) => {
+  sb.auth.onAuthStateChange((evenement) => {
     if (evenement === "SIGNED_OUT") afficherSession(null);
   });
 }
@@ -70,9 +81,9 @@ async function afficherSession(session) {
   }
   $("#email-compte").textContent = session.user.email;
   ecran("appli");
-  await Promise.all([chargerStats(), chargerDemandes()]);
+  await Promise.all([chargerDemandes(), chargerEntreprises()]);
   rendreFiltres();
-  await chargerFiches();
+  changerVue("accueil");
 }
 
 $("#form-connexion").addEventListener("submit", async (e) => {
@@ -88,27 +99,216 @@ $("#form-connexion").addEventListener("submit", async (e) => {
   afficherSession(data.session);
 });
 
-// ---------- Statistiques et filtres ----------
-async function chargerStats() {
-  const { data, error } = await sb.rpc("stats_cvtheque");
-  if (!error) etat.stats = data;
-}
-
+// ---------- Outils de formulaire ----------
 const options = (liste, vide, valeur) =>
-  `<option value="">${vide}</option>` +
+  (vide === null ? "" : `<option value="">${vide}</option>`) +
   liste.map((v) => {
     const [k, l] = Array.isArray(v) ? v : [v, v];
     return `<option value="${esc(k)}"${k === valeur ? " selected" : ""}>${esc(l)}</option>`;
   }).join("");
 
+/** Ouvre la fenêtre de formulaire ; `enregistrer` reçoit le FormData et renvoie un message d'erreur ou rien. */
+function fenetre(html, enregistrer, libelleBouton = "Enregistrer", extra = "") {
+  const form = $("#form-fenetre");
+  form.innerHTML = `${html}
+    <p class="erreur" id="erreur-fenetre" role="alert"></p>
+    <div class="envoi">${extra}
+      <button type="button" class="bouton discret" data-action="fermer-fenetre">Annuler</button>
+      <button type="submit" class="bouton">${libelleBouton}</button>
+    </div>`;
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const bouton = form.querySelector('button[type="submit"]');
+    bouton.disabled = true;
+    try {
+      const probleme = await enregistrer(new FormData(form));
+      if (probleme) $("#erreur-fenetre").textContent = probleme;
+      else $("#fenetre").close();
+    } catch (err) {
+      console.error(err);
+      $("#erreur-fenetre").textContent = /CV|fichier/.test(err?.message || "") ? err.message : "L'enregistrement n'a pas abouti. Réessayez.";
+    } finally {
+      bouton.disabled = false;
+    }
+  };
+  $("#fenetre").showModal();
+  form.querySelector("input, select, textarea")?.focus();
+}
+const val = (f, k) => (f.get(k) ?? "").toString().trim() || null;
+
+function marquerVue(vue) {
+  etat.vue = vue;
+  document.querySelectorAll(".vues button").forEach((b) => b.setAttribute("aria-current", b.dataset.vue === vue ? "page" : "false"));
+  $("#corps-appli").classList.toggle("sans-filtres", vue !== "fiches");
+}
+
+function changerVue(vue) {
+  marquerVue(vue);
+  fermerDossier();
+  if (vue === "accueil") return chargerAccueil();
+  if (vue === "fiches") return chargerFiches();
+  if (vue === "postes") return rendrePostes();
+  if (vue === "entreprises") return rendreEntreprises();
+}
+
+// =====================================================================
+// Tableau de bord
+// =====================================================================
+async function chargerAccueil() {
+  const [bord, relances, derniers] = await Promise.all([
+    sb.rpc("tableau_de_bord"),
+    sb.from("relances").select("*, candidats(id, prenom, nom), entreprises(id, nom), demandes(id, titre)").eq("fait", false).order("echeance").limit(40),
+    sb.from("candidats").select(COLONNES_LISTE).order("cree_le", { ascending: false }).limit(6),
+  ]);
+  if (bord.error) {
+    console.error(bord.error);
+    $("#contenu").innerHTML = `<div class="vide"><h2>Le module CRM n'est pas encore installé</h2><p>Dans Supabase, ouvrez <b>SQL Editor</b> → <b>New query</b>, collez le contenu du fichier <code>supabase/crm.sql</code> puis cliquez sur <b>Run</b>. Rechargez ensuite cette page.</p></div>`;
+    return;
+  }
+  etat.bord = bord.data || {};
+  etat.relances = relances.data || [];
+  etat.derniers = derniers.data || [];
+  rendreAccueil();
+  rendreFiltres();
+}
+
+function ligneRelance(r) {
+  const j = aujourdhui();
+  const classe = r.echeance < j ? "retard" : r.echeance === j ? "jour" : "";
+  const quand = r.echeance < j ? `En retard, ${jourCourt.format(new Date(r.echeance))}` : r.echeance === j ? "Aujourd'hui" : jourCourt.format(new Date(r.echeance));
+  const lien = r.candidats
+    ? `<button type="button" class="lien" data-fiche="${r.candidats.id}">${esc(r.candidats.prenom)} ${esc(r.candidats.nom)}</button>`
+    : r.entreprises
+      ? `<button type="button" class="lien" data-entreprise="${r.entreprises.id}">${esc(r.entreprises.nom)}</button>`
+      : r.demandes
+        ? `<button type="button" class="lien" data-poste="${r.demandes.id}">${esc(r.demandes.titre)}</button>`
+        : "";
+  return `<li class="relance ${classe}">
+      <input type="checkbox" data-faire="${r.id}" aria-label="Marquer « ${esc(r.titre)} » comme fait">
+      <span class="relance-texte"><b>${esc(r.titre)}</b>${lien ? `<span>${lien}</span>` : ""}</span>
+      <span class="relance-date">${quand}</span>
+    </li>`;
+}
+
+function barres(objet, libeller = (k) => k, couleur = () => "var(--action)") {
+  const lignes = Object.entries(objet || {}).sort((a, b) => b[1] - a[1]);
+  if (!lignes.length) return `<p class="aide">Pas encore de données.</p>`;
+  const max = Math.max(...lignes.map(([, n]) => n));
+  return `<ul class="barres">${lignes.map(([k, n]) => `<li><span>${esc(libeller(k))}</span><i style="--w:${(n / max) * 100}%;--c:${couleur(k)}"></i><b>${n}</b></li>`).join("")}</ul>`;
+}
+
+const SOURCES = { chaine: "Chaîne WhatsApp", accompagnement: "Accompagnement", formulaire: "Formulaire", statut: "Statut WhatsApp", linkedin: "LinkedIn", facebook: "Facebook", "ajout par l'équipe": "Ajout manuel", inconnue: "Inconnue" };
+
+function rendreAccueil() {
+  const b = etat.bord;
+  const evolution = b.semaine - b.semaine_precedente;
+  const enRetard = etat.relances.filter((r) => r.echeance < aujourdhui());
+  const tuile = (n, titre, detail, vue) => `<button type="button" class="tuile" ${vue ? `data-vue="${vue}"` : ""}><b data-compte="${n}">${n}</b><span>${titre}</span>${detail ? `<small>${detail}</small>` : ""}</button>`;
+  $("#contenu").innerHTML = `
+    <div class="resume">
+      <h1>Tableau de bord</h1>
+      <div class="outils">
+        <button type="button" class="bouton petit secondaire" data-action="nouvelle-relance">Nouvelle relance</button>
+        <button type="button" class="bouton petit" data-action="nouveau-poste">Nouveau poste</button>
+      </div>
+    </div>
+    <div class="tuiles">
+      ${tuile(b.actifs, pluriel(b.actifs, "profil dans la CVthèque", "profils dans la CVthèque"), `${b.semaine} ${pluriel(b.semaine, "reçu", "reçus")} cette semaine${evolution ? ` (${evolution > 0 ? "+" : ""}${evolution})` : ""}`, "fiches")}
+      ${tuile(b.postes_ouverts, pluriel(b.postes_ouverts, "poste à pourvoir", "postes à pourvoir"), `${b.entreprises} ${pluriel(b.entreprises, "entreprise active", "entreprises actives")}`, "postes")}
+      ${tuile(b.en_cours, pluriel(b.en_cours, "candidat en process", "candidats en process"), "sur les postes ouverts", "postes")}
+      ${tuile(b.places_30j, pluriel(b.places_30j, "placement", "placements"), "ces 30 derniers jours", "")}
+    </div>
+    <div class="bord">
+      <section class="panneau">
+        <div class="panneau-titre"><h2>À faire</h2>${enRetard.length ? `<span class="tampon retard">${enRetard.length} en retard</span>` : ""}</div>
+        ${etat.relances.length
+          ? `<ul class="relances">${etat.relances.map(ligneRelance).join("")}</ul>`
+          : `<div class="vide petit"><p>Aucune relance prévue. Ajoutez-en depuis une fiche, un poste ou une entreprise : « rappeler Aïcha jeudi », « envoyer la shortlist au client »…</p></div>`}
+      </section>
+      <section class="panneau">
+        <h2>Pipeline des postes ouverts</h2>
+        ${barres(Object.fromEntries(ETAPES.map(([k]) => [k, b.etapes?.[k] || 0]).filter(([, n]) => n)), libelleEtape)}
+        <h2 class="sous-titre">Provenance des CV</h2>
+        ${barres(b.sources, (k) => SOURCES[k] || k, () => "var(--ambre)")}
+      </section>
+      <section class="panneau">
+        <h2>Derniers CV reçus</h2>
+        ${etat.derniers.length ? `<div class="fiches compactes">${etat.derniers.map((c, i) => ligneFiche(c, i)).join("")}</div>` : `<p class="aide">Aucun CV pour l'instant.</p>`}
+      </section>
+      <section class="panneau">
+        <h2>Profils par domaine</h2>
+        ${barres(b.domaines, (k) => k, (k) => couleurDomaine(k))}
+      </section>
+    </div>`;
+  compter();
+}
+
+// Les chiffres montent jusqu'à leur valeur (0,6 s) à l'affichage du tableau de bord.
+function compter() {
+  if (reduit()) return;
+  document.querySelectorAll("[data-compte]").forEach((el) => {
+    const cible = Number(el.dataset.compte);
+    if (!cible) return;
+    const debut = performance.now();
+    const pas = (t) => {
+      const x = Math.min(1, (t - debut) / 600);
+      el.textContent = Math.round(cible * (1 - Math.pow(1 - x, 3)));
+      if (x < 1) requestAnimationFrame(pas);
+    };
+    requestAnimationFrame(pas);
+  });
+}
+
+// ---------- Relances ----------
+function ouvrirFormulaireRelance(lien = {}) {
+  const demain = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const cible = lien.candidat ? `${lien.candidat.prenom} ${lien.candidat.nom}` : lien.entreprise?.nom || lien.poste?.titre;
+  fenetre(`
+    <h2>Nouvelle relance</h2>
+    ${cible ? `<p class="aide">Pour : <b>${esc(cible)}</b></p>` : ""}
+    <label class="champ"><span>Que faut-il faire ?</span><input type="text" name="titre" required placeholder="Ex. : rappeler pour confirmer l'entretien"></label>
+    <label class="champ"><span>Pour quand ?</span><input type="date" name="echeance" value="${demain}" required></label>
+    ${cible ? "" : `<label class="champ"><span>Liée à un poste (facultatif)</span><select name="demande_id">${options(etat.demandes.map((d) => [d.id, d.titre]), "Aucun")}</select></label>`}`,
+  async (f) => {
+    const titre = val(f, "titre");
+    if (!titre) return "Indiquez ce qu'il faut faire.";
+    const { error } = await sb.from("relances").insert({
+      titre, echeance: val(f, "echeance") || aujourdhui(),
+      candidat_id: lien.candidat?.id ?? null, entreprise_id: lien.entreprise?.id ?? null,
+      demande_id: lien.poste?.id ?? val(f, "demande_id"),
+    });
+    if (error) throw error;
+    flash("Relance ajoutée.");
+    await rafraichir();
+  }, "Ajouter la relance");
+}
+
+async function marquerFait(id) {
+  const { error } = await sb.from("relances").update({ fait: true, fait_le: new Date().toISOString() }).eq("id", id);
+  if (error) return echec(error);
+  flash("Relance terminée.");
+  await rafraichir();
+}
+
+/** Recharge ce qui est affiché après une modification. */
+async function rafraichir() {
+  if (etat.ouvert) await ouvrirFiche(etat.ouvert.c.id, false);
+  if (etat.vue === "accueil") await chargerAccueil();
+  else if (etat.vue === "postes" && etat.posteOuvert) await ouvrirPoste(etat.posteOuvert.d.id);
+  else if (etat.vue === "entreprises" && etat.entrepriseOuverte) await ouvrirEntreprise(etat.entrepriseOuverte.e.id);
+}
+
+// =====================================================================
+// Candidats (fiches)
+// =====================================================================
 function rendreFiltres() {
   const f = etat.filtres;
-  const comptes = etat.stats?.domaines || {};
+  const comptes = etat.bord?.domaines || {};
   $("#filtres").innerHTML = `
     <div>
       <h2>Domaines</h2>
       <div class="onglets-domaines">
-        <button type="button" data-domaine="" aria-pressed="${!f.domaine}" style="--c:var(--encre)"><i></i>Tous les domaines<em>${etat.stats?.total ?? ""}</em></button>
+        <button type="button" data-domaine="" aria-pressed="${!f.domaine}" style="--c:var(--encre)"><i></i>Tous les domaines<em>${etat.bord?.actifs ?? ""}</em></button>
         ${DOMAINES.map(([n, c]) => `<button type="button" data-domaine="${esc(n)}" aria-pressed="${f.domaine === n}" style="--c:${c}"><i></i>${esc(n)}<em>${comptes[n] || ""}</em></button>`).join("")}
       </div>
     </div>
@@ -140,7 +340,6 @@ $("#recherche").addEventListener("input", (e) => {
   }, 300);
 });
 
-// ---------- Fiches ----------
 function requeteFiches(colonnes, avecCompte) {
   const f = etat.filtres;
   let q = sb.from("candidats").select(colonnes, avecCompte ? { count: "exact" } : undefined);
@@ -164,10 +363,9 @@ async function chargerFiches() {
   if (error) return echec(error, "Impossible de charger les fiches.");
   etat.fiches = data;
   etat.total = count ?? data.length;
-  etat.cascade = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  etat.cascade = !reduit();
   rendreFiches();
   etat.cascade = false;
-  compter();
 }
 
 function ligneFiche(c, i = 0) {
@@ -186,23 +384,17 @@ function ligneFiche(c, i = 0) {
 }
 
 function rendreFiches() {
-  const s = etat.stats || {};
   const filtresActifs = Object.values(etat.filtres).some(Boolean) || etat.texte;
   const pages = Math.max(1, Math.ceil(etat.total / PAR_PAGE));
   const liste = etat.fiches.length
     ? `<div class="fiches${etat.cascade ? " cascade" : ""}">${etat.fiches.map(ligneFiche).join("")}</div>`
     : filtresActifs
-      ? `<div class="vide"><h2>Aucune fiche ne correspond</h2><p>Retirez un filtre ou essayez d'autres mots, par exemple le poste sans le lieu.</p></div>`
-      : `<div class="vide"><h2>La CVthèque est vide pour l'instant</h2><p>Partagez le lien du formulaire de dépôt sur votre chaîne, ou ajoutez une fiche vous-même avec « Ajouter une fiche ».</p></div>`;
+      ? `<div class="vide"><h2>Aucun candidat ne correspond</h2><p>Retirez un filtre ou essayez d'autres mots, par exemple le poste sans le lieu.</p></div>`
+      : `<div class="vide"><h2>La CVthèque est vide pour l'instant</h2><p>Partagez le lien du formulaire de dépôt, ou ajoutez un candidat vous-même avec « Ajouter une fiche ».</p></div>`;
   $("#contenu").innerHTML = `
-    ${etat.selectionPour ? `<div class="bandeau"><span>Vous choisissez des profils pour la demande <b>${esc(etat.selectionPour.titre)}</b>. Ouvrez une fiche puis « Proposer pour cette demande ».</span><button class="bouton petit secondaire" style="color:#fff;border-color:#fff" type="button" data-action="fin-selection">Terminer</button></div>` : ""}
+    ${etat.selectionPour ? `<div class="bandeau"><span>Vous cherchez des profils pour le poste <b>${esc(etat.selectionPour.titre)}</b>. Ouvrez une fiche puis « Ajouter au pipeline ».</span><button class="bouton petit secondaire" style="color:#fff;border-color:#fff" type="button" data-action="fin-selection">Revenir au poste</button></div>` : ""}
     <div class="resume">
-      <h1>${filtresActifs ? `${etat.total} fiche${etat.total > 1 ? "s" : ""} trouvée${etat.total > 1 ? "s" : ""}` : "Fiches"}</h1>
-      <div class="chiffres">
-        <span><b data-compte="${s.total ?? ""}">${s.total ?? "–"}</b> ${pluriel(s.total, "profil actif", "profils actifs")}</span>
-        <span><b data-compte="${s.semaine ?? ""}">${s.semaine ?? "–"}</b> ${pluriel(s.semaine, "reçu", "reçus")} cette semaine</span>
-        <span><b data-compte="${s.demandes ?? ""}">${s.demandes ?? "–"}</b> ${pluriel(s.demandes, "demande ouverte", "demandes ouvertes")}</span>
-      </div>
+      <h1>${filtresActifs ? `${etat.total} ${pluriel(etat.total, "candidat trouvé", "candidats trouvés")}` : "Candidats"}</h1>
       <div class="outils">
         <label><span class="visuellement-cache">Trier</span>
           <select id="tri">
@@ -225,34 +417,18 @@ function rendreFiches() {
   });
 }
 
-// Les chiffres du résumé montent jusqu'à leur valeur au premier affichage (0,6 s).
-let dejaCompte = false;
-function compter() {
-  if (dejaCompte || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  dejaCompte = true;
-  document.querySelectorAll("[data-compte]").forEach((b) => {
-    const cible = Number(b.dataset.compte);
-    if (!cible) return;
-    const debut = performance.now();
-    const pas = (t) => {
-      const x = Math.min(1, (t - debut) / 600);
-      b.textContent = Math.round(cible * (1 - Math.pow(1 - x, 3)));
-      if (x < 1) requestAnimationFrame(pas);
-    };
-    requestAnimationFrame(pas);
-  });
-}
-
 // ---------- Dossier d'un candidat ----------
-async function ouvrirFiche(id) {
-  const [c, notes, liens] = await Promise.all([
+async function ouvrirFiche(id, defiler = true) {
+  const [c, notes, liens, relances] = await Promise.all([
     sb.from("candidats").select("*").eq("id", id).single(),
     sb.from("notes").select("*").eq("candidat_id", id).order("cree_le", { ascending: false }),
-    sb.from("demande_candidats").select("etape, demande_id, demandes(titre, statut)").eq("candidat_id", id),
+    sb.from("demande_candidats").select("etape, demande_id, demandes(titre, statut, entreprises(nom))").eq("candidat_id", id),
+    sb.from("relances").select("*").eq("candidat_id", id).eq("fait", false).order("echeance"),
   ]);
   if (c.error) return echec(c.error, "Impossible d'ouvrir ce dossier.");
-  etat.ouvert = { c: c.data, notes: notes.data || [], liens: liens.data || [] };
+  etat.ouvert = { c: c.data, notes: notes.data || [], liens: liens.data || [], relances: relances.data || [] };
   rendreDossier();
+  if (defiler) $("#dossier").scrollTop = 0;
   document.querySelectorAll(".fiche").forEach((b) => b.setAttribute("aria-current", String(b.dataset.fiche === id)));
 }
 
@@ -264,11 +440,22 @@ function numeroWhatsapp(tel) {
   return d;
 }
 
+const formulaireJournal = (cible) => `
+  <form class="form-journal" data-journal="${cible}">
+    <div class="journal-ligne">
+      <label><span class="visuellement-cache">Type</span><select name="type">${options(TYPES_ACTIVITE, null, "appel")}</select></label>
+      <label class="journal-texte"><span class="visuellement-cache">Compte rendu</span><textarea name="texte" required placeholder="Ce qui s'est dit, la suite prévue…"></textarea></label>
+    </div>
+    <div class="envoi" style="margin-top:.5rem"><button class="bouton petit" type="submit">Ajouter au journal</button></div>
+  </form>`;
+const listeJournal = (notes) => `<div class="notes">${notes.map((n) => `<article><p><span class="type-activite ${esc(n.type || "note")}">${esc(libelle(TYPES_ACTIVITE, n.type || "note"))}</span> ${esc(n.texte)}</p><small>${esc(n.auteur || "")}, le ${jour(n.cree_le)}</small></article>`).join("")}</div>`;
+const listeRelances = (relances) => (relances.length ? `<ul class="relances">${relances.map(ligneRelance).join("")}</ul>` : `<p class="aide">Aucune relance prévue.</p>`);
+
 function rendreDossier() {
-  const { c, notes, liens } = etat.ouvert;
+  const { c, notes, liens, relances } = etat.ouvert;
   const wa = numeroWhatsapp(c.telephone);
   const ligne = (t, v) => (v ? `<dt>${t}</dt><dd>${v}</dd>` : "");
-  const demandesOuvertes = etat.demandes.filter((d) => d.statut === "ouverte" && !liens.some((l) => l.demande_id === d.id));
+  const postesLibres = etat.demandes.filter((d) => d.statut === "ouverte" && !liens.some((l) => l.demande_id === d.id));
   const panneau = $("#dossier");
   panneau.style.setProperty("--c", couleurDomaine(c.domaine));
   panneau.innerHTML = `
@@ -283,14 +470,33 @@ function rendreDossier() {
         ${wa ? `<a class="bouton secondaire petit" target="_blank" rel="noopener" href="https://wa.me/${wa}?text=${encodeURIComponent(`Bonjour ${c.prenom}, `)}">WhatsApp</a>` : ""}
         ${c.telephone ? `<a class="bouton discret petit" href="tel:${esc(c.telephone.replace(/[^\d+]/g, ""))}">Appeler</a>` : ""}
         ${c.email ? `<a class="bouton discret petit" href="mailto:${esc(c.email)}">Email</a>` : ""}
+        <button type="button" class="bouton discret petit" data-action="relance-candidat">Relance</button>
       </div>
       <div class="reglages">
         <label><span class="visuellement-cache">Statut</span><select id="statut-dossier">${STATUTS.map(([k, l]) => `<option value="${k}"${c.statut === k ? " selected" : ""}>${l}</option>`).join("")}</select></label>
         <span class="note-etoiles" role="group" aria-label="Note">${[1, 2, 3, 4, 5].map((n) => `<button type="button" data-note="${n}" aria-pressed="${(c.note || 0) >= n}" aria-label="${n} sur 5">★</button>`).join("")}</span>
-        ${etat.selectionPour ? `<button type="button" class="bouton petit" data-action="proposer-selection">Proposer pour « ${esc(etat.selectionPour.titre)} »</button>` : ""}
+        ${etat.selectionPour && !liens.some((l) => l.demande_id === etat.selectionPour.id) ? `<button type="button" class="bouton petit" data-action="ajouter-selection">Ajouter au pipeline « ${esc(etat.selectionPour.titre)} »</button>` : ""}
       </div>
     </div>
     <section id="zone-apercu" hidden></section>
+    <section>
+      <h3>Postes et pipeline</h3>
+      ${liens.length ? `<div class="propositions">${liens.map((l) => `<div class="proposition">
+          <button type="button" class="lien" data-poste="${l.demande_id}">${esc(l.demandes?.titre)}</button>
+          <span class="aide">${esc(l.demandes?.entreprises?.nom || "")}</span>
+          <select data-etape="${c.id}" data-demande="${l.demande_id}" aria-label="Étape">${options(ETAPES, null, l.etape)}</select>
+        </div>`).join("")}</div>` : `<p class="aide">Sur aucun poste pour l'instant.</p>`}
+      ${postesLibres.length ? `<div class="reglages"><label><span class="visuellement-cache">Poste</span><select id="choix-poste">${options(postesLibres.map((d) => [d.id, d.titre + (d.entreprises?.nom ? `, ${d.entreprises.nom}` : "")]), null)}</select></label><button type="button" class="bouton secondaire petit" data-action="ajouter-poste">Ajouter au pipeline</button></div>` : ""}
+    </section>
+    <section>
+      <h3>Relances</h3>
+      ${listeRelances(relances)}
+    </section>
+    <section>
+      <h3>Journal</h3>
+      ${formulaireJournal(`candidat:${c.id}`)}
+      ${listeJournal(notes)}
+    </section>
     <section>
       <h3>Recherche</h3>
       <dl class="infos">
@@ -312,25 +518,12 @@ function rendreDossier() {
         ${ligne("Téléphone", esc(c.telephone))}
         ${ligne("Email", esc(c.email))}
         ${ligne("LinkedIn", /^https?:\/\//i.test(c.linkedin || "") ? `<a href="${esc(c.linkedin)}" target="_blank" rel="noopener">${esc(c.linkedin)}</a>` : esc(c.linkedin))}
-        ${ligne("Provenance", esc(c.source))}
+        ${ligne("Provenance", esc(SOURCES[c.source] || c.source))}
         ${ligne("Reçu le", jour(c.cree_le))}
         ${ligne("Accord", c.consentement_le ? `Donné le ${jour(c.consentement_le)}` : "Non enregistré")}
       </dl>
       ${c.message ? `<p style="margin-top:.8rem;white-space:pre-wrap"><b>Son mot :</b> ${esc(c.message)}</p>` : ""}
       ${(c.anciens_cv || []).length ? `<p style="margin-top:.8rem"><b>Anciens CV :</b></p><ul class="liste-simple">${c.anciens_cv.map((a, i) => `<li><button type="button" class="bouton discret petit" data-ancien="${i}">${esc(a.nom || "CV")}, remplacé le ${jour(a.remplace_le)}</button></li>`).join("")}</ul>` : ""}
-    </section>
-    <section>
-      <h3>Demandes</h3>
-      ${liens.length ? `<ul class="liste-simple">${liens.map((l) => `<li>${esc(l.demandes?.titre)} : ${esc((ETAPES.find(([k]) => k === l.etape) || [, l.etape])[1])}</li>`).join("")}</ul>` : `<p class="aide">Proposé à aucune demande pour l'instant.</p>`}
-      ${demandesOuvertes.length ? `<div class="reglages"><label><span class="visuellement-cache">Demande</span><select id="choix-demande">${demandesOuvertes.map((d) => `<option value="${d.id}">${esc(d.titre)}</option>`).join("")}</select></label><button type="button" class="bouton secondaire petit" data-action="proposer">Proposer</button></div>` : ""}
-    </section>
-    <section>
-      <h3>Notes</h3>
-      <form id="form-note">
-        <label class="champ"><span class="visuellement-cache">Nouvelle note</span><textarea name="texte" required placeholder="Appel du 12/11 : disponible, très motivée…"></textarea></label>
-        <div class="envoi" style="margin-top:.5rem"><button class="bouton petit" type="submit">Ajouter la note</button></div>
-      </form>
-      <div class="notes">${notes.map((n) => `<article><p>${esc(n.texte)}</p><small>${esc(n.auteur || "")}, le ${jour(n.cree_le)}</small></article>`).join("")}</div>
     </section>
     <section>
       <div class="envoi" style="margin-top:0">
@@ -340,9 +533,7 @@ function rendreDossier() {
     </section>`;
   panneau.hidden = false;
   document.body.classList.add("dossier-ouvert");
-
   $("#statut-dossier").addEventListener("change", (e) => majFiche({ statut: e.target.value }, "Statut mis à jour."));
-  $("#form-note").addEventListener("submit", ajouterNote);
 }
 
 async function majFiche(champs, message) {
@@ -355,17 +546,6 @@ async function majFiche(champs, message) {
   rendreDossier();
   if (etat.vue === "fiches") rendreFiches();
   if (message) flash(message);
-}
-
-async function ajouterNote(e) {
-  e.preventDefault();
-  const texte = new FormData(e.target).get("texte").trim();
-  if (!texte) return;
-  const { data, error } = await sb.from("notes").insert({ candidat_id: etat.ouvert.c.id, texte }).select().single();
-  if (error) return echec(error);
-  etat.ouvert.notes.unshift(data);
-  rendreDossier();
-  flash("Note ajoutée.");
 }
 
 async function lienCv(chemin, nom, telecharger = false) {
@@ -383,18 +563,10 @@ async function voirCv() {
     zone.innerHTML = c.cv_chemin.endsWith(".pdf")
       ? `<iframe class="apercu" src="${esc(url)}" title="CV de ${esc(c.prenom)} ${esc(c.nom)}"></iframe><p class="aide" style="margin-top:.5rem"><a href="${esc(url)}" target="_blank" rel="noopener">Ouvrir dans un nouvel onglet</a></p>`
       : `<p>Les fichiers Word ne s'affichent pas ici. <a href="${esc(url)}" target="_blank" rel="noopener">Ouvrir le fichier</a></p>`;
-    zone.scrollIntoView({ behavior: "smooth", block: "start" });
+    zone.scrollIntoView({ behavior: reduit() ? "auto" : "smooth", block: "start" });
   } catch (err) {
     echec(err, "Impossible d'ouvrir le CV.");
   }
-}
-
-async function proposer(demandeId) {
-  const { error } = await sb.from("demande_candidats").upsert({ demande_id: demandeId, candidat_id: etat.ouvert.c.id });
-  if (error) return echec(error);
-  if (etat.ouvert.c.statut === "nouveau" || etat.ouvert.c.statut === "qualifie") await majFiche({ statut: "propose" });
-  await ouvrirFiche(etat.ouvert.c.id);
-  flash("Profil proposé pour la demande.");
 }
 
 async function supprimerFiche() {
@@ -406,9 +578,7 @@ async function supprimerFiche() {
   if (error) return echec(error);
   fermerDossier();
   flash("Fiche supprimée.");
-  await chargerStats();
-  rendreFiltres();
-  chargerFiches();
+  changerVue(etat.vue);
 }
 
 function fermerDossier() {
@@ -421,9 +591,8 @@ function fermerDossier() {
 // ---------- Ajouter / modifier une fiche ----------
 function ouvrirFormulaireFiche(c = null) {
   const v = (k) => esc(c?.[k] ?? "");
-  const form = $("#form-fiche");
-  form.innerHTML = `
-    <h2>${c ? `Modifier la fiche de ${esc(c.prenom)} ${esc(c.nom)}` : "Ajouter une fiche"}</h2>
+  fenetre(`
+    <h2>${c ? `Modifier la fiche de ${esc(c.prenom)} ${esc(c.nom)}` : "Ajouter un candidat"}</h2>
     <div class="grille deux">
       <label class="champ"><span>Prénom</span><input type="text" name="prenom" required value="${v("prenom")}"></label>
       <label class="champ"><span>Nom</span><input type="text" name="nom" required value="${v("nom")}"></label>
@@ -448,38 +617,19 @@ function ouvrirFormulaireFiche(c = null) {
     </div>
     <label class="fichier"><b>${c?.cv_chemin ? "Remplacer le CV" : "CV"}</b><span class="aide">PDF ou Word, 5 Mo maximum${c?.cv_chemin ? ". L'ancien reste dans l'historique." : " (facultatif)."}</span>
       <input type="file" name="cv" accept=".pdf,.doc,.docx"></label>
-    ${c ? "" : `<label class="accord" style="margin-top:0"><input type="checkbox" name="consentement"><span>La personne a accepté que son CV soit conservé et transmis à des recruteurs.</span></label>`}
-    <p class="erreur" id="erreur-fiche" role="alert"></p>
-    <div class="envoi">
-      <button type="button" class="bouton discret" data-action="fermer-fenetre">Annuler</button>
-      <button type="submit" class="bouton" value="ok">${c ? "Enregistrer" : "Ajouter la fiche"}</button>
-    </div>`;
-  form.onsubmit = (e) => enregistrerFiche(e, c);
-  $("#fenetre-fiche").showModal();
-}
-
-async function enregistrerFiche(e, c) {
-  e.preventDefault();
-  const f = new FormData(e.target);
-  const zone = $("#erreur-fiche");
-  const champs = {
-    prenom: f.get("prenom").trim(), nom: f.get("nom").trim(), telephone: f.get("telephone").trim() || null,
-    email: f.get("email").trim().toLowerCase() || null, ville: f.get("ville").trim() || null, pays: f.get("pays").trim() || "Bénin",
-    domaine: f.get("domaine"), postes: f.get("postes").trim(), contrats: f.getAll("contrats"),
-    niveau: f.get("niveau") || null, experience: f.get("experience") === "" ? null : Number(f.get("experience")),
-    disponibilite: f.get("disponibilite") || null, pretentions: f.get("pretentions").trim() || null,
-    competences: f.get("competences").trim() || null, langues: f.get("langues").trim() || null,
-    linkedin: f.get("linkedin").trim() || null,
-  };
-  if (!champs.prenom || !champs.nom || !champs.domaine || !champs.postes) {
-    zone.textContent = "Prénom, nom, domaine et poste sont obligatoires.";
-    return;
-  }
-  champs.telephone_chiffres = champs.telephone ? champs.telephone.replace(/\D/g, "").replace(/^(00)?229/, "") || null : null;
-  const fichier = f.get("cv");
-  const bouton = e.target.querySelector('button[type="submit"]');
-  bouton.disabled = true;
-  try {
+    ${c ? "" : `<label class="accord" style="margin-top:0"><input type="checkbox" name="consentement"><span>La personne a accepté que son CV soit conservé et transmis à des recruteurs.</span></label>`}`,
+  async (f) => {
+    const champs = {
+      prenom: val(f, "prenom"), nom: val(f, "nom"), telephone: val(f, "telephone"),
+      email: val(f, "email")?.toLowerCase() ?? null, ville: val(f, "ville"), pays: val(f, "pays") || "Bénin",
+      domaine: val(f, "domaine"), postes: val(f, "postes"), contrats: f.getAll("contrats"),
+      niveau: val(f, "niveau"), experience: val(f, "experience") === null ? null : Number(val(f, "experience")),
+      disponibilite: val(f, "disponibilite"), pretentions: val(f, "pretentions"),
+      competences: val(f, "competences"), langues: val(f, "langues"), linkedin: val(f, "linkedin"),
+    };
+    if (!champs.prenom || !champs.nom || !champs.domaine || !champs.postes) return "Prénom, nom, domaine et poste sont obligatoires.";
+    champs.telephone_chiffres = champs.telephone ? champs.telephone.replace(/\D/g, "").replace(/^(00)?229/, "") || null : null;
+    const fichier = f.get("cv");
     if (fichier && fichier.size) {
       champs.cv_chemin = await envoyerCv(fichier, "equipe");
       champs.cv_nom = fichier.name.slice(0, 200);
@@ -496,138 +646,194 @@ async function enregistrerFiche(e, c) {
       if (error) throw error;
       id = data.id;
     }
-    $("#fenetre-fiche").close();
-    flash(c ? "Fiche enregistrée." : "Fiche ajoutée.");
-    await chargerStats();
-    rendreFiltres();
-    await chargerFiches();
+    flash(c ? "Fiche enregistrée." : "Candidat ajouté.");
+    if (etat.vue === "fiches") await chargerFiches();
     await ouvrirFiche(id);
-  } catch (err) {
-    console.error(err);
-    zone.textContent = err?.message?.includes("CV") || err?.message?.includes("fichier") ? err.message : "L'enregistrement n'a pas abouti. Réessayez.";
-  } finally {
-    bouton.disabled = false;
-  }
+  }, c ? "Enregistrer" : "Ajouter le candidat");
 }
 
 // ---------- Export Excel (CSV) ----------
 async function exporter() {
-  const { data, error } = await requeteFiches("prenom,nom,telephone,email,ville,pays,domaine,postes,contrats,niveau,experience,disponibilite,pretentions,competences,langues,statut,note,cree_le", false).limit(5000);
+  const { data, error } = await requeteFiches("prenom,nom,telephone,email,ville,pays,domaine,postes,contrats,niveau,experience,disponibilite,pretentions,competences,langues,statut,note,source,cree_le", false).limit(5000);
   if (error) return echec(error, "Export impossible.");
-  const entetes = ["Prénom", "Nom", "Téléphone", "Email", "Ville", "Pays", "Domaine", "Postes", "Contrats", "Niveau", "Expérience", "Disponibilité", "Prétentions", "Compétences", "Langues", "Statut", "Note", "Reçu le"];
+  const entetes = ["Prénom", "Nom", "Téléphone", "Email", "Ville", "Pays", "Domaine", "Postes", "Contrats", "Niveau", "Expérience", "Disponibilité", "Prétentions", "Compétences", "Langues", "Statut", "Note", "Provenance", "Reçu le"];
   const cellule = (v) => {
     let t = Array.isArray(v) ? v.join(", ") : String(v ?? "");
     if (/^[=+\-@]/.test(t)) t = "'" + t; // pas de formule dans Excel
     return `"${t.replace(/"/g, '""')}"`;
   };
-  const lignes = data.map((c) => [c.prenom, c.nom, c.telephone, c.email, c.ville, c.pays, c.domaine, c.postes, c.contrats, c.niveau, c.experience, c.disponibilite, c.pretentions, c.competences, c.langues, libelleStatut(c.statut), c.note, jour(c.cree_le)].map(cellule).join(";"));
+  const lignes = data.map((c) => [c.prenom, c.nom, c.telephone, c.email, c.ville, c.pays, c.domaine, c.postes, c.contrats, c.niveau, c.experience, c.disponibilite, c.pretentions, c.competences, c.langues, libelleStatut(c.statut), c.note, SOURCES[c.source] || c.source, jour(c.cree_le)].map(cellule).join(";"));
   const blob = new Blob(["﻿" + [entetes.join(";"), ...lignes].join("\r\n")], { type: "text/csv;charset=utf-8" });
-  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `cvtheque-${new Date().toISOString().slice(0, 10)}.csv` });
+  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `cvtheque-${aujourdhui()}.csv` });
   a.click();
   URL.revokeObjectURL(a.href);
-  flash(`${data.length} fiche${data.length > 1 ? "s" : ""} exportée${data.length > 1 ? "s" : ""}.`);
+  flash(`${data.length} ${pluriel(data.length, "fiche exportée", "fiches exportées")}.`);
 }
 
-// ---------- Demandes ----------
+// =====================================================================
+// Postes à pourvoir et pipeline (Kanban)
+// =====================================================================
 async function chargerDemandes() {
-  const { data, error } = await sb.from("demandes").select("*, demande_candidats(count)").order("statut").order("cree_le", { ascending: false });
+  const { data, error } = await sb.from("demandes").select("*, entreprises(id, nom), demande_candidats(etape)").order("statut").order("cree_le", { ascending: false });
   if (!error) etat.demandes = data;
 }
 
-async function ouvrirDemande(id) {
-  const d = etat.demandes.find((x) => x.id === id);
-  const { data, error } = await sb.from("demande_candidats")
-    .select("etape, ajoute_le, candidats(id, prenom, nom, postes, ville, experience, telephone, cv_chemin, cv_nom, domaine)")
-    .eq("demande_id", id).order("ajoute_le");
-  if (error) return echec(error);
-  etat.demandeOuverte = { d, propositions: data };
-  rendreDemandes();
+function rendrePostes() {
+  const ouvert = etat.posteOuvert;
+  const liste = etat.demandes.length
+    ? etat.demandes.map((d) => {
+        const n = d.demande_candidats?.length || 0;
+        const places = d.demande_candidats?.filter((x) => x.etape === "place").length || 0;
+        return `<button type="button" class="demande-carte" data-poste="${d.id}" style="--c:${couleurDomaine(d.domaine)}" aria-current="${ouvert?.d.id === d.id}">
+          <b>${esc(d.titre)}</b>
+          <small>${esc([d.entreprises?.nom || d.client, d.ville].filter(Boolean).join(", "))}</small>
+          <small>${esc(libelle(STATUTS_DEMANDE, d.statut))}, ${n} ${pluriel(n, "candidat", "candidats")}${places ? `, ${places} ${pluriel(places, "placé", "placés")}` : ""}</small>
+        </button>`;
+      }).join("")
+    : `<div class="vide petit"><h2>Aucun poste</h2><p>Quand une entreprise vous confie un recrutement, créez le poste pour suivre les candidats étape par étape.</p></div>`;
+  $("#contenu").innerHTML = `
+    <div class="resume"><h1>Postes à pourvoir</h1><div class="outils"><button type="button" class="bouton petit" data-action="nouveau-poste">Nouveau poste</button></div></div>
+    <div class="demandes"><div class="liste-postes">${liste}</div><div id="detail-poste">${ouvert ? "" : `<div class="panneau"><p class="aide">Choisissez un poste pour voir son pipeline, ou créez-en un.</p></div>`}</div></div>`;
+  if (ouvert) rendrePipeline();
 }
 
-function rendreDemandes() {
-  const ouverte = etat.demandeOuverte;
-  const liste = etat.demandes.length
-    ? etat.demandes.map((d) => `<button type="button" class="demande-carte" data-demande="${d.id}" style="--c:${couleurDomaine(d.domaine)}" aria-current="${ouverte?.d.id === d.id}">
-        <b>${esc(d.titre)}</b>
-        <small>${esc([d.client, d.ville, (STATUTS_DEMANDE.find(([k]) => k === d.statut) || [, d.statut])[1]].filter(Boolean).join(", "))}, ${d.demande_candidats?.[0]?.count ?? 0} profil(s)</small>
-      </button>`).join("")
-    : `<div class="vide"><h2>Aucune demande</h2><p>Quand une recruteuse vous demande des profils, créez une demande pour suivre les candidats proposés.</p></div>`;
-  let detail = `<div class="panneau"><p class="aide">Choisissez une demande, ou créez-en une.</p></div>`;
-  if (ouverte) {
-    const { d, propositions } = ouverte;
-    detail = `<div class="panneau" style="border-top:6px solid ${couleurDomaine(d.domaine)}">
-      <div class="tete-ligne" style="display:flex;gap:.75rem;align-items:flex-start;flex-wrap:wrap">
-        <div><h2>${esc(d.titre)}</h2><p class="aide">${esc([d.client, d.domaine, d.ville].filter(Boolean).join(", "))}${d.echeance ? `, pour le ${jour(d.echeance)}` : ""}</p></div>
-        <label style="margin-left:auto"><span class="visuellement-cache">Statut</span><select id="statut-demande">${STATUTS_DEMANDE.map(([k, l]) => `<option value="${k}"${d.statut === k ? " selected" : ""}>${l}</option>`).join("")}</select></label>
+async function ouvrirPoste(id) {
+  if (etat.vue !== "postes") marquerVue("postes");
+  await chargerDemandes();
+  const d = etat.demandes.find((x) => x.id === id);
+  if (!d) return;
+  const [pipeline, relances] = await Promise.all([
+    sb.from("demande_candidats").select("etape, ajoute_le, modifie_le, candidats(id, prenom, nom, postes, ville, experience, telephone, cv_chemin, domaine, note)").eq("demande_id", id).order("modifie_le", { ascending: false }),
+    sb.from("relances").select("*").eq("demande_id", id).eq("fait", false).order("echeance"),
+  ]);
+  if (pipeline.error) return echec(pipeline.error);
+  etat.posteOuvert = { d, pipeline: pipeline.data.filter((p) => p.candidats), relances: relances.data || [] };
+  rendrePostes();
+}
+
+function rendrePipeline() {
+  const { d, pipeline, relances } = etat.posteOuvert;
+  const infos = [d.entreprises?.nom || d.client, d.domaine, d.ville, d.contrat, d.experience_min != null ? `${d.experience_min} an(s) d'expérience minimum` : "", d.salaire, d.nb_postes > 1 ? `${d.nb_postes} postes` : "", d.echeance ? `pour le ${jour(d.echeance)}` : ""].filter(Boolean);
+  const carte = (p) => {
+    const c = p.candidats;
+    return `<article class="carte-pipeline" draggable="true" data-glisse="${c.id}" style="--c:${couleurDomaine(c.domaine)}">
+        <button type="button" class="lien" data-fiche="${c.id}">${esc(c.prenom)} ${esc(c.nom)}</button>
+        <small>${esc([c.postes, c.ville, c.experience != null ? `${c.experience} an(s)` : ""].filter(Boolean).join(", "))}</small>
+        ${c.note ? `<span class="etoiles">${"★".repeat(c.note)}</span>` : ""}
+        <label><span class="visuellement-cache">Étape</span><select data-etape="${c.id}" data-demande="${d.id}">${options(ETAPES, null, p.etape)}</select></label>
+      </article>`;
+  };
+  $("#detail-poste").innerHTML = `
+    <div class="panneau poste-tete" style="--c:${couleurDomaine(d.domaine)}">
+      <div class="tete-ligne">
+        <div><h2>${esc(d.titre)}</h2><p class="aide">${infos.map(esc).join(", ")}</p></div>
+        <label style="margin-left:auto"><span class="visuellement-cache">Statut</span><select id="statut-poste">${options(STATUTS_DEMANDE, null, d.statut)}</select></label>
       </div>
-      ${d.details ? `<p style="margin-top:.8rem;white-space:pre-wrap">${esc(d.details)}</p>` : ""}
+      ${d.details ? `<p class="details-poste">${esc(d.details)}</p>` : ""}
       <div class="envoi">
-        <button type="button" class="bouton" data-action="chercher-profils">Trouver des profils</button>
-        <button type="button" class="bouton secondaire" data-action="copier-message" ${propositions.length ? "" : "disabled"}>Copier le message pour la recruteuse</button>
-        <button type="button" class="bouton discret petit" data-action="modifier-demande">Modifier</button>
+        <button type="button" class="bouton" data-action="matching">Profils compatibles</button>
+        <button type="button" class="bouton secondaire" data-action="chercher-profils">Chercher dans la CVthèque</button>
+        <button type="button" class="bouton secondaire" data-action="copier-message">Message pour le client</button>
+        <button type="button" class="bouton discret petit" data-action="relance-poste">Relance</button>
+        <button type="button" class="bouton discret petit" data-action="modifier-poste">Modifier</button>
       </div>
-      <h3 style="margin-top:1.5rem">Profils proposés (${propositions.length})</h3>
-      ${propositions.length ? `<div class="propositions">${propositions.map((p) => `<div class="proposition">
-          <button type="button" class="lien" data-fiche="${p.candidats.id}">${esc(p.candidats.prenom)} ${esc(p.candidats.nom)}</button>
-          <span class="aide">${esc(p.candidats.postes)}${p.candidats.experience != null ? `, ${p.candidats.experience} an(s)` : ""}${p.candidats.ville ? `, ${esc(p.candidats.ville)}` : ""}</span>
-          <select data-etape="${p.candidats.id}" aria-label="Étape">${ETAPES.map(([k, l]) => `<option value="${k}"${p.etape === k ? " selected" : ""}>${l}</option>`).join("")}</select>
-          <button type="button" class="bouton discret petit" data-retirer="${p.candidats.id}">Retirer</button>
-        </div>`).join("")}</div>` : `<p class="aide">Aucun profil proposé. Cliquez sur « Trouver des profils » pour chercher dans la CVthèque.</p>`}
+      ${relances.length ? `<div class="relances-poste"><h3>Relances</h3>${listeRelances(relances)}</div>` : ""}
+    </div>
+    <div class="kanban" aria-label="Pipeline du poste">
+      ${ETAPES.map(([k, l]) => {
+        const cartes = pipeline.filter((p) => p.etape === k);
+        return `<section class="colonne ${k}" data-colonne="${k}">
+          <h3>${l} <span>${cartes.length}</span></h3>
+          <div class="cartes">${cartes.map(carte).join("") || `<p class="colonne-vide">Glissez un candidat ici</p>`}</div>
+        </section>`;
+      }).join("")}
     </div>`;
-  }
-  $("#contenu").innerHTML = `
-    <div class="resume"><h1>Demandes de profils</h1><div class="outils"><button type="button" class="bouton petit" data-action="nouvelle-demande">Nouvelle demande</button></div></div>
-    <div class="demandes"><div>${liste}</div><div>${detail}</div></div>`;
-  $("#statut-demande")?.addEventListener("change", async (e) => {
-    const { error } = await sb.from("demandes").update({ statut: e.target.value }).eq("id", ouverte.d.id);
+  $("#statut-poste").addEventListener("change", async (e) => {
+    const { error } = await sb.from("demandes").update({ statut: e.target.value }).eq("id", d.id);
     if (error) return echec(error);
-    ouverte.d.statut = e.target.value;
-    await chargerStats();
-    rendreDemandes();
-    flash("Demande mise à jour.");
+    flash("Poste mis à jour.");
+    await ouvrirPoste(d.id);
+  });
+  brancherGlisser();
+}
+
+// Glisser-déposer des cartes entre colonnes (sur téléphone : la liste « Étape » de chaque carte).
+function brancherGlisser() {
+  document.querySelectorAll(".carte-pipeline").forEach((carte) => {
+    carte.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData("text/plain", carte.dataset.glisse);
+      carte.classList.add("glisse");
+    });
+    carte.addEventListener("dragend", () => carte.classList.remove("glisse"));
+  });
+  document.querySelectorAll(".colonne").forEach((col) => {
+    col.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      col.classList.add("survol");
+    });
+    col.addEventListener("dragleave", () => col.classList.remove("survol"));
+    col.addEventListener("drop", (e) => {
+      e.preventDefault();
+      col.classList.remove("survol");
+      const id = e.dataTransfer.getData("text/plain");
+      if (id) changerEtape(etat.posteOuvert.d.id, id, col.dataset.colonne);
+    });
   });
 }
 
-function ouvrirFormulaireDemande(d = null) {
+async function changerEtape(demandeId, candidatId, etape) {
+  const { error } = await sb.from("demande_candidats").update({ etape, modifie_le: new Date().toISOString() }).eq("demande_id", demandeId).eq("candidat_id", candidatId);
+  if (error) return echec(error);
+  if (STATUT_PAR_ETAPE[etape]) await sb.from("candidats").update({ statut: STATUT_PAR_ETAPE[etape], modifie_le: new Date().toISOString() }).eq("id", candidatId);
+  flash(`Étape : ${libelleEtape(etape)}.`);
+  if (etat.posteOuvert?.d.id === demandeId && etat.vue === "postes") await ouvrirPoste(demandeId);
+  if (etat.ouvert?.c.id === candidatId) await ouvrirFiche(candidatId, false);
+}
+
+async function ajouterAuPipeline(demandeId, candidatId) {
+  const { error } = await sb.from("demande_candidats").upsert({ demande_id: demandeId, candidat_id: candidatId, etape: "source" }, { onConflict: "demande_id,candidat_id", ignoreDuplicates: true });
+  if (error) return echec(error);
+  flash("Candidat ajouté au pipeline.");
+  await chargerDemandes();
+}
+
+function ouvrirFormulairePoste(d = null, entrepriseId = null) {
   const v = (k) => esc(d?.[k] ?? "");
-  const form = $("#form-demande");
-  form.innerHTML = `
-    <h2>${d ? "Modifier la demande" : "Nouvelle demande de profils"}</h2>
-    <label class="champ"><span>Poste recherché</span><input type="text" name="titre" required value="${v("titre")}" placeholder="Ex. : Comptable confirmé(e)"></label>
+  fenetre(`
+    <h2>${d ? "Modifier le poste" : "Nouveau poste à pourvoir"}</h2>
+    <label class="champ"><span>Intitulé du poste</span><input type="text" name="titre" required value="${v("titre")}" placeholder="Ex. : Comptable confirmé(e)"></label>
     <div class="grille deux">
-      <label class="champ"><span>Pour qui (entreprise, recruteuse)</span><input type="text" name="client" value="${v("client")}"></label>
-      <label class="champ"><span>Ville</span><input type="text" name="ville" value="${v("ville")}"></label>
+      <label class="champ"><span>Entreprise</span><select name="entreprise_id">${options(etat.entreprises.map((e) => [e.id, e.nom]), "Aucune (à préciser)", d?.entreprise_id ?? entrepriseId)}</select></label>
       <label class="champ"><span>Domaine</span><select name="domaine">${options(DOMAINES.map(([n]) => n), "Choisir…", d?.domaine)}</select></label>
-      <label class="champ"><span>À fournir avant le</span><input type="date" name="echeance" value="${v("echeance")}"></label>
+      <label class="champ"><span>Ville</span><input type="text" name="ville" value="${v("ville")}"></label>
+      <label class="champ"><span>Contrat</span><select name="contrat">${options(CONTRATS, "Choisir…", d?.contrat)}</select></label>
+      <label class="champ"><span>Expérience minimale (ans)</span><input type="number" min="0" max="40" name="experience_min" value="${v("experience_min")}"></label>
+      <label class="champ"><span>Salaire proposé</span><input type="text" name="salaire" value="${v("salaire")}" placeholder="Ex. : 200 000 FCFA / mois"></label>
+      <label class="champ"><span>Nombre de postes</span><input type="number" min="1" max="99" name="nb_postes" value="${d?.nb_postes ?? 1}"></label>
+      <label class="champ"><span>À pourvoir avant le</span><input type="date" name="echeance" value="${v("echeance")}"></label>
     </div>
-    <label class="champ"><span>Détails du besoin</span><textarea name="details" placeholder="Expérience, diplôme, salaire, horaires…">${v("details")}</textarea></label>
-    <p class="erreur" id="erreur-demande" role="alert"></p>
-    <div class="envoi">
-      ${d ? `<button type="button" class="bouton danger" data-action="supprimer-demande" style="margin-right:auto">Supprimer</button>` : ""}
-      <button type="button" class="bouton discret" data-action="fermer-fenetre">Annuler</button>
-      <button type="submit" class="bouton">${d ? "Enregistrer" : "Créer la demande"}</button>
-    </div>`;
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    const f = new FormData(form);
+    <label class="champ"><span>Détails du besoin</span><textarea name="details" placeholder="Missions, diplôme, horaires, avantages…">${v("details")}</textarea></label>
+    <p class="aide">Pas encore l'entreprise dans la liste ? Créez-la d'abord dans l'onglet Entreprises.</p>`,
+  async (f) => {
     const champs = {
-      titre: f.get("titre").trim(), client: f.get("client").trim() || null, ville: f.get("ville").trim() || null,
-      domaine: f.get("domaine") || null, echeance: f.get("echeance") || null, details: f.get("details").trim() || null,
+      titre: val(f, "titre"), entreprise_id: val(f, "entreprise_id"), domaine: val(f, "domaine"), ville: val(f, "ville"),
+      contrat: val(f, "contrat"), experience_min: val(f, "experience_min") === null ? null : Number(val(f, "experience_min")),
+      salaire: val(f, "salaire"), nb_postes: Number(val(f, "nb_postes") || 1), echeance: val(f, "echeance"), details: val(f, "details"),
     };
-    if (!champs.titre) return ($("#erreur-demande").textContent = "Indiquez le poste recherché.");
+    if (!champs.titre) return "Indiquez l'intitulé du poste.";
     const r = d ? await sb.from("demandes").update(champs).eq("id", d.id).select().single() : await sb.from("demandes").insert(champs).select().single();
-    if (r.error) return echec(r.error);
-    $("#fenetre-demande").close();
-    await Promise.all([chargerDemandes(), chargerStats()]);
-    await ouvrirDemande(r.data.id);
-    flash(d ? "Demande enregistrée." : "Demande créée.");
-  };
-  $("#fenetre-demande").showModal();
+    if (r.error) throw r.error;
+    flash(d ? "Poste enregistré." : "Poste créé.");
+    fermerDossier();
+    await ouvrirPoste(r.data.id);
+  }, d ? "Enregistrer" : "Créer le poste",
+  d ? `<button type="button" class="bouton danger" data-action="supprimer-poste" style="margin-right:auto">Supprimer</button>` : "");
 }
 
 async function copierMessage() {
-  const { d, propositions } = etat.demandeOuverte;
-  const retenus = propositions.filter((p) => p.etape !== "refuse");
+  const { d, pipeline } = etat.posteOuvert;
+  const retenus = pipeline.filter((p) => ["presente", "entretien", "offre"].includes(p.etape));
+  if (!retenus.length) return flash("Passez d'abord des candidats à l'étape « Présenté au client ».", true);
   const chemins = retenus.map((p) => p.candidats.cv_chemin).filter(Boolean);
   let liens = {};
   if (chemins.length) {
@@ -640,10 +846,7 @@ async function copierMessage() {
     "",
     ...retenus.map((p, i) => {
       const c = p.candidats;
-      return [
-        `${i + 1}. ${c.prenom} ${c.nom}, ${c.postes}${c.experience != null ? `, ${c.experience} an(s) d'expérience` : ""}${c.ville ? `, ${c.ville}` : ""}`,
-        c.cv_chemin ? `   CV : ${liens[c.cv_chemin]}` : "",
-      ].filter(Boolean).join("\n");
+      return [`${i + 1}. ${c.prenom} ${c.nom}, ${c.postes}${c.experience != null ? `, ${c.experience} an(s) d'expérience` : ""}${c.ville ? `, ${c.ville}` : ""}`, c.cv_chemin ? `   CV : ${liens[c.cv_chemin]}` : ""].filter(Boolean).join("\n");
     }),
     "",
     "Les liens des CV restent valables 7 jours.",
@@ -656,21 +859,233 @@ async function copierMessage() {
   }
 }
 
-// ---------- Navigation ----------
-function changerVue(vue) {
-  etat.vue = vue;
-  document.querySelectorAll(".vues button").forEach((b) => b.setAttribute("aria-current", b.dataset.vue === vue ? "page" : "false"));
-  $("#corps-appli").classList.toggle("sans-filtres", vue !== "fiches");
-  if (vue === "fiches") chargerFiches();
-  else rendreDemandes();
+// ---------- Matching automatique ----------
+const MOTS_VIDES = new Set(["pour", "avec", "dans", "des", "les", "une", "sur", "confirme", "confirmee", "junior", "senior"]);
+const normal = (t) => sansAccents(String(t || "").toLowerCase());
+const motsCles = (t) => [...new Set(normal(t).split(/[^a-z0-9+#]+/).filter((m) => m.length > 2 && !MOTS_VIDES.has(m)))];
+
+/** Score sur 100 : domaine 30, intitulé 30, ville 15, expérience 10, contrat 10, disponibilité 5. */
+function scorer(c, d) {
+  const raisons = [];
+  let score = 0;
+  if (d.domaine && c.domaine === d.domaine) { score += 30; raisons.push("même domaine"); }
+  const mots = motsCles(d.titre);
+  if (mots.length) {
+    const texte = normal(`${c.postes} ${c.competences || ""}`);
+    const trouves = mots.filter((m) => texte.includes(m.slice(0, Math.max(4, m.length - 2))));
+    if (trouves.length) { score += Math.round((30 * trouves.length) / mots.length); raisons.push(`poste : ${trouves.join(", ")}`); }
+  }
+  if (d.ville && c.ville && (normal(c.ville).includes(normal(d.ville)) || normal(d.ville).includes(normal(c.ville)))) { score += 15; raisons.push(c.ville); }
+  if (d.experience_min != null) {
+    if (c.experience != null && c.experience >= d.experience_min) { score += 10; raisons.push(`${c.experience} an(s) d'expérience`); }
+    else if (c.experience != null && c.experience >= d.experience_min - 1) score += 5;
+  } else if (c.experience != null) score += 5;
+  if (d.contrat) { if ((c.contrats || []).includes(d.contrat)) { score += 10; raisons.push(d.contrat); } }
+  else score += 5;
+  if (c.disponibilite === "Immédiate") { score += 5; raisons.push("dispo. immédiate"); }
+  else if (c.disponibilite === "Sous 2 semaines") score += 3;
+  return { score: Math.min(100, score), raisons };
 }
 
+async function matching() {
+  const { d, pipeline } = etat.posteOuvert;
+  const colonnes = "id,prenom,nom,postes,competences,domaine,ville,experience,contrats,disponibilite,note";
+  const requetes = [];
+  if (d.domaine) requetes.push(sb.from("candidats").select(colonnes).eq("domaine", d.domaine).neq("statut", "archive").limit(400));
+  const mots = motsCles(d.titre);
+  if (mots.length) requetes.push(sb.from("candidats").select(colonnes).neq("statut", "archive").textSearch("recherche", mots.join(" or "), { type: "websearch", config: "french" }).limit(300));
+  if (!requetes.length) return flash("Indiquez au moins le domaine ou l'intitulé du poste.", true);
+  const resultats = await Promise.all(requetes);
+  const erreur = resultats.find((r) => r.error);
+  if (erreur) return echec(erreur.error, "Recherche des profils impossible.");
+  const deja = new Set(pipeline.map((p) => p.candidats.id));
+  const vus = new Map();
+  for (const r of resultats) for (const c of r.data) if (!deja.has(c.id)) vus.set(c.id, c);
+  const classes = [...vus.values()].map((c) => ({ c, ...scorer(c, d) })).sort((a, b) => b.score - a.score || (b.c.note || 0) - (a.c.note || 0)).slice(0, 25);
+  $("#contenu-large").innerHTML = `
+    <div class="large-tete"><h2>Profils compatibles : ${esc(d.titre)}</h2><button type="button" class="bouton discret petit" data-action="fermer-large">Fermer</button></div>
+    <p class="aide">Classement selon le domaine, l'intitulé du poste, la ville, l'expérience, le contrat et la disponibilité. Les candidats déjà dans le pipeline n'apparaissent pas.</p>
+    ${classes.length ? `<ol class="matchs">${classes.map(({ c, score, raisons }) => `<li style="--c:${couleurDomaine(c.domaine)}">
+        <span class="match-score" style="--s:${score}"><b>${score}</b><small>/100</small></span>
+        <span class="match-qui"><button type="button" class="lien" data-fiche="${c.id}">${esc(c.prenom)} ${esc(c.nom)}</button><small>${esc(c.postes)}</small>
+          <span class="puces-raisons">${raisons.map((r) => `<span>${esc(r)}</span>`).join("")}</span></span>
+        <button type="button" class="bouton petit secondaire" data-ajouter-match="${c.id}">Ajouter</button>
+      </li>`).join("")}</ol>` : `<div class="vide petit"><p>Aucun profil proche pour l'instant. Précisez le domaine du poste, ou partagez le lien de dépôt pour recevoir plus de CV.</p></div>`}`;
+  $("#fenetre-large").showModal();
+}
+
+// =====================================================================
+// Entreprises clientes
+// =====================================================================
+async function chargerEntreprises() {
+  const { data, error } = await sb.from("entreprises").select("id, nom, secteur, ville, statut").order("nom");
+  if (!error) etat.entreprises = data;
+}
+
+function rendreEntreprises() {
+  const ouverte = etat.entrepriseOuverte;
+  const liste = etat.entreprises.length
+    ? etat.entreprises.map((e) => `<button type="button" class="demande-carte entreprise-carte" data-entreprise="${e.id}" aria-current="${ouverte?.e.id === e.id}">
+        <b>${esc(e.nom)}</b><small>${esc([e.secteur, e.ville].filter(Boolean).join(", "))}</small>
+        <small class="statut-entreprise ${esc(e.statut)}">${esc(libelle(STATUTS_ENTREPRISE, e.statut))}</small>
+      </button>`).join("")
+    : `<div class="vide petit"><h2>Aucune entreprise</h2><p>Ajoutez les entreprises qui vous confient des recrutements, et leurs contacts.</p></div>`;
+  $("#contenu").innerHTML = `
+    <div class="resume"><h1>Entreprises</h1><div class="outils"><button type="button" class="bouton petit" data-action="nouvelle-entreprise">Nouvelle entreprise</button></div></div>
+    <div class="demandes"><div class="liste-postes">${liste}</div><div id="detail-entreprise">${ouverte ? "" : `<div class="panneau"><p class="aide">Choisissez une entreprise pour voir ses contacts, ses postes et l'historique des échanges.</p></div>`}</div></div>`;
+  if (ouverte) rendreEntreprise();
+}
+
+async function ouvrirEntreprise(id) {
+  if (etat.vue !== "entreprises") marquerVue("entreprises");
+  const [e, contacts, postes, notes, relances] = await Promise.all([
+    sb.from("entreprises").select("*").eq("id", id).single(),
+    sb.from("contacts").select("*").eq("entreprise_id", id).order("nom"),
+    sb.from("demandes").select("id, titre, statut, cree_le, demande_candidats(etape)").eq("entreprise_id", id).order("cree_le", { ascending: false }),
+    sb.from("notes").select("*").eq("entreprise_id", id).order("cree_le", { ascending: false }),
+    sb.from("relances").select("*").eq("entreprise_id", id).eq("fait", false).order("echeance"),
+  ]);
+  if (e.error) return echec(e.error);
+  etat.entrepriseOuverte = { e: e.data, contacts: contacts.data || [], postes: postes.data || [], notes: notes.data || [], relances: relances.data || [] };
+  rendreEntreprises();
+}
+
+function rendreEntreprise() {
+  const { e, contacts, postes, notes, relances } = etat.entrepriseOuverte;
+  const places = postes.reduce((n, p) => n + (p.demande_candidats || []).filter((x) => x.etape === "place").length, 0);
+  $("#detail-entreprise").innerHTML = `
+    <div class="panneau">
+      <div class="tete-ligne">
+        <div><h2>${esc(e.nom)}</h2><p class="aide">${esc([e.secteur, e.ville, e.adresse].filter(Boolean).join(", "))}</p>
+          ${e.site ? `<p><a href="${/^https?:\/\//i.test(e.site) ? esc(e.site) : `https://${esc(e.site)}`}" target="_blank" rel="noopener">${esc(e.site)}</a></p>` : ""}</div>
+        <label style="margin-left:auto"><span class="visuellement-cache">Statut</span><select id="statut-entreprise">${options(STATUTS_ENTREPRISE, null, e.statut)}</select></label>
+      </div>
+      <p class="chiffres-entreprise"><b>${postes.length}</b> ${pluriel(postes.length, "poste confié", "postes confiés")}, <b>${places}</b> ${pluriel(places, "placement", "placements")}</p>
+      ${e.notes ? `<p class="details-poste">${esc(e.notes)}</p>` : ""}
+      <div class="envoi">
+        <button type="button" class="bouton" data-action="nouveau-poste-entreprise">Nouveau poste</button>
+        <button type="button" class="bouton secondaire" data-action="nouveau-contact">Ajouter un contact</button>
+        <button type="button" class="bouton discret petit" data-action="relance-entreprise">Relance</button>
+        <button type="button" class="bouton discret petit" data-action="modifier-entreprise">Modifier</button>
+      </div>
+    </div>
+    <div class="bord deux-colonnes">
+      <section class="panneau">
+        <h2>Contacts</h2>
+        ${contacts.length ? `<ul class="contacts">${contacts.map((ct) => {
+          const wa = numeroWhatsapp(ct.telephone);
+          return `<li><span><b>${esc(ct.nom)}</b>${ct.fonction ? `<small>${esc(ct.fonction)}</small>` : ""}</span>
+            <span class="contact-actions">
+              ${wa ? `<a class="bouton secondaire petit" target="_blank" rel="noopener" href="https://wa.me/${wa}">WhatsApp</a>` : ""}
+              ${ct.telephone ? `<a class="bouton discret petit" href="tel:${esc(ct.telephone.replace(/[^\d+]/g, ""))}">Appeler</a>` : ""}
+              ${ct.email ? `<a class="bouton discret petit" href="mailto:${esc(ct.email)}">Email</a>` : ""}
+              <button type="button" class="bouton discret petit" data-supprimer-contact="${ct.id}" aria-label="Retirer ${esc(ct.nom)}">Retirer</button>
+            </span></li>`;
+        }).join("")}</ul>` : `<p class="aide">Aucun contact. Ajoutez la personne qui vous transmet les besoins.</p>`}
+        <h2 class="sous-titre">Postes confiés</h2>
+        ${postes.length ? `<ul class="liste-simple">${postes.map((p) => `<li><button type="button" class="lien" data-poste="${p.id}">${esc(p.titre)}</button> <span class="aide">${esc(libelle(STATUTS_DEMANDE, p.statut))}, ${(p.demande_candidats || []).length} candidat(s), ${jour(p.cree_le)}</span></li>`).join("")}</ul>` : `<p class="aide">Aucun poste pour l'instant.</p>`}
+        <h2 class="sous-titre">Relances</h2>
+        ${listeRelances(relances)}
+      </section>
+      <section class="panneau">
+        <h2>Journal des échanges</h2>
+        ${formulaireJournal(`entreprise:${e.id}`)}
+        ${listeJournal(notes)}
+      </section>
+    </div>`;
+  $("#statut-entreprise").addEventListener("change", async (ev) => {
+    const { error } = await sb.from("entreprises").update({ statut: ev.target.value }).eq("id", e.id);
+    if (error) return echec(error);
+    await chargerEntreprises();
+    await ouvrirEntreprise(e.id);
+    flash("Entreprise mise à jour.");
+  });
+}
+
+function ouvrirFormulaireEntreprise(e = null) {
+  const v = (k) => esc(e?.[k] ?? "");
+  fenetre(`
+    <h2>${e ? "Modifier l'entreprise" : "Nouvelle entreprise"}</h2>
+    <label class="champ"><span>Nom</span><input type="text" name="nom" required value="${v("nom")}"></label>
+    <div class="grille deux">
+      <label class="champ"><span>Secteur</span><input type="text" name="secteur" value="${v("secteur")}" placeholder="Ex. : BTP, banque, ONG"></label>
+      <label class="champ"><span>Ville</span><input type="text" name="ville" value="${v("ville")}"></label>
+      <label class="champ"><span>Adresse</span><input type="text" name="adresse" value="${v("adresse")}"></label>
+      <label class="champ"><span>Site web</span><input type="text" name="site" value="${v("site")}"></label>
+      <label class="champ"><span>Statut</span><select name="statut">${options(STATUTS_ENTREPRISE, null, e?.statut || "client")}</select></label>
+    </div>
+    <label class="champ"><span>Notes</span><textarea name="notes" placeholder="Conditions, habitudes de recrutement, délais de paiement…">${v("notes")}</textarea></label>`,
+  async (f) => {
+    const champs = { nom: val(f, "nom"), secteur: val(f, "secteur"), ville: val(f, "ville"), adresse: val(f, "adresse"), site: val(f, "site"), statut: val(f, "statut") || "client", notes: val(f, "notes") };
+    if (!champs.nom) return "Indiquez le nom de l'entreprise.";
+    const r = e ? await sb.from("entreprises").update(champs).eq("id", e.id).select().single() : await sb.from("entreprises").insert(champs).select().single();
+    if (r.error) throw r.error;
+    await chargerEntreprises();
+    flash(e ? "Entreprise enregistrée." : "Entreprise ajoutée.");
+    await ouvrirEntreprise(r.data.id);
+  }, e ? "Enregistrer" : "Ajouter l'entreprise",
+  e ? `<button type="button" class="bouton danger" data-action="supprimer-entreprise" style="margin-right:auto">Supprimer</button>` : "");
+}
+
+function ouvrirFormulaireContact() {
+  const { e } = etat.entrepriseOuverte;
+  fenetre(`
+    <h2>Nouveau contact chez ${esc(e.nom)}</h2>
+    <div class="grille deux">
+      <label class="champ"><span>Nom</span><input type="text" name="nom" required></label>
+      <label class="champ"><span>Fonction</span><input type="text" name="fonction" placeholder="Ex. : DRH, gérante"></label>
+      <label class="champ"><span>Téléphone (WhatsApp)</span><input type="tel" name="telephone"></label>
+      <label class="champ"><span>Email</span><input type="email" name="email"></label>
+    </div>`,
+  async (f) => {
+    const champs = { entreprise_id: e.id, nom: val(f, "nom"), fonction: val(f, "fonction"), telephone: val(f, "telephone"), email: val(f, "email") };
+    if (!champs.nom) return "Indiquez le nom du contact.";
+    const { error } = await sb.from("contacts").insert(champs);
+    if (error) throw error;
+    flash("Contact ajouté.");
+    await ouvrirEntreprise(e.id);
+  }, "Ajouter le contact");
+}
+
+// =====================================================================
+// Journal (candidat ou entreprise)
+// =====================================================================
+document.addEventListener("submit", async (e) => {
+  const form = e.target.closest(".form-journal");
+  if (!form) return;
+  e.preventDefault();
+  const f = new FormData(form);
+  const texte = val(f, "texte");
+  if (!texte) return;
+  const [genre, id] = form.dataset.journal.split(":");
+  const ligne = { type: f.get("type") || "note", texte, [genre === "candidat" ? "candidat_id" : "entreprise_id"]: id };
+  const { error } = await sb.from("notes").insert(ligne);
+  if (error) return echec(error);
+  flash("Ajouté au journal.");
+  if (genre === "candidat") await ouvrirFiche(id, false);
+  else await ouvrirEntreprise(id);
+});
+
+// =====================================================================
+// Clics
+// =====================================================================
 document.addEventListener("click", async (e) => {
   const cible = e.target.closest("button, [data-action]");
   if (!cible) return;
   const ds = cible.dataset;
   if (ds.vue) return changerVue(ds.vue);
-  if (ds.fiche) return ouvrirFiche(ds.fiche);
+  if (ds.fiche) {
+    if (cible.closest("#fenetre-large")) $("#fenetre-large").close();
+    return ouvrirFiche(ds.fiche);
+  }
+  if (ds.poste) {
+    fermerDossier();
+    return ouvrirPoste(ds.poste);
+  }
+  if (ds.entreprise) {
+    fermerDossier();
+    return ouvrirEntreprise(ds.entreprise);
+  }
   if (ds.domaine !== undefined && cible.closest(".onglets-domaines")) {
     etat.filtres.domaine = ds.domaine;
     etat.page = 0;
@@ -688,12 +1103,16 @@ document.addEventListener("click", async (e) => {
     try { window.open(await lienCv(a.chemin), "_blank", "noopener"); } catch (err) { echec(err, "Impossible d'ouvrir ce CV."); }
     return;
   }
-  if (ds.demande) return ouvrirDemande(ds.demande);
-  if (ds.retirer) {
-    const { error } = await sb.from("demande_candidats").delete().eq("demande_id", etat.demandeOuverte.d.id).eq("candidat_id", ds.retirer);
+  if (ds.ajouterMatch) {
+    await ajouterAuPipeline(etat.posteOuvert.d.id, ds.ajouterMatch);
+    cible.closest("li").remove();
+    return ouvrirPoste(etat.posteOuvert.d.id);
+  }
+  if (ds.supprimerContact) {
+    if (!confirm("Retirer ce contact ?")) return;
+    const { error } = await sb.from("contacts").delete().eq("id", ds.supprimerContact);
     if (error) return echec(error);
-    await chargerDemandes();
-    return ouvrirDemande(etat.demandeOuverte.d.id);
+    return ouvrirEntreprise(etat.entrepriseOuverte.e.id);
   }
   switch (ds.action) {
     case "deconnexion": await sb.auth.signOut(); return location.reload();
@@ -709,32 +1128,46 @@ document.addEventListener("click", async (e) => {
       rendreFiltres();
       return chargerFiches();
     case "fermer": return fermerDossier();
+    case "fermer-fenetre": return cible.closest("dialog").close();
+    case "fermer-large": return $("#fenetre-large").close();
     case "voir-cv": return voirCv();
     case "telecharger-cv":
       try { location.href = await lienCv(etat.ouvert.c.cv_chemin, etat.ouvert.c.cv_nom, true); } catch (err) { echec(err, "Téléchargement impossible."); }
       return;
-    case "proposer": return proposer($("#choix-demande").value);
-    case "proposer-selection": return proposer(etat.selectionPour.id);
     case "modifier": return ouvrirFormulaireFiche(etat.ouvert.c);
     case "supprimer": return supprimerFiche();
     case "nouvelle-fiche": return ouvrirFormulaireFiche();
-    case "fermer-fenetre": return cible.closest("dialog").close();
     case "exporter": return exporter();
-    case "nouvelle-demande": return ouvrirFormulaireDemande();
-    case "modifier-demande": return ouvrirFormulaireDemande(etat.demandeOuverte.d);
-    case "supprimer-demande": {
-      const d = etat.demandeOuverte.d;
-      if (!confirm(`Supprimer la demande « ${d.titre} » ? Les fiches des candidats sont conservées.`)) return;
+    case "nouvelle-relance": return ouvrirFormulaireRelance();
+    case "relance-candidat": return ouvrirFormulaireRelance({ candidat: etat.ouvert.c });
+    case "relance-poste": return ouvrirFormulaireRelance({ poste: etat.posteOuvert.d });
+    case "relance-entreprise": return ouvrirFormulaireRelance({ entreprise: etat.entrepriseOuverte.e });
+    case "ajouter-poste": {
+      await ajouterAuPipeline($("#choix-poste").value, etat.ouvert.c.id);
+      return ouvrirFiche(etat.ouvert.c.id, false);
+    }
+    case "ajouter-selection": {
+      await ajouterAuPipeline(etat.selectionPour.id, etat.ouvert.c.id);
+      return ouvrirFiche(etat.ouvert.c.id, false);
+    }
+    case "nouveau-poste": return ouvrirFormulairePoste();
+    case "nouveau-poste-entreprise": return ouvrirFormulairePoste(null, etat.entrepriseOuverte.e.id);
+    case "modifier-poste": return ouvrirFormulairePoste(etat.posteOuvert.d);
+    case "supprimer-poste": {
+      const d = etat.posteOuvert.d;
+      if (!confirm(`Supprimer le poste « ${d.titre} » et son pipeline ? Les fiches des candidats sont conservées.`)) return;
       const { error } = await sb.from("demandes").delete().eq("id", d.id);
       if (error) return echec(error);
-      $("#fenetre-demande").close();
-      etat.demandeOuverte = null;
-      await Promise.all([chargerDemandes(), chargerStats()]);
-      rendreDemandes();
-      return flash("Demande supprimée.");
+      $("#fenetre").close();
+      etat.posteOuvert = null;
+      await chargerDemandes();
+      rendrePostes();
+      return flash("Poste supprimé.");
     }
+    case "matching": return matching();
+    case "copier-message": return copierMessage();
     case "chercher-profils": {
-      const d = etat.demandeOuverte.d;
+      const d = etat.posteOuvert.d;
       etat.selectionPour = d;
       Object.keys(etat.filtres).forEach((k) => (etat.filtres[k] = ""));
       etat.filtres.domaine = d.domaine || "";
@@ -748,20 +1181,29 @@ document.addEventListener("click", async (e) => {
       const id = etat.selectionPour.id;
       etat.selectionPour = null;
       fermerDossier();
-      await chargerDemandes();
-      changerVue("demandes");
-      return ouvrirDemande(id);
+      return ouvrirPoste(id);
     }
-    case "copier-message": return copierMessage();
+    case "nouvelle-entreprise": return ouvrirFormulaireEntreprise();
+    case "modifier-entreprise": return ouvrirFormulaireEntreprise(etat.entrepriseOuverte.e);
+    case "supprimer-entreprise": {
+      const en = etat.entrepriseOuverte.e;
+      if (!confirm(`Supprimer « ${en.nom} », ses contacts et son journal ? Ses postes sont conservés, sans entreprise.`)) return;
+      const { error } = await sb.from("entreprises").delete().eq("id", en.id);
+      if (error) return echec(error);
+      $("#fenetre").close();
+      etat.entrepriseOuverte = null;
+      await Promise.all([chargerEntreprises(), chargerDemandes()]);
+      rendreEntreprises();
+      return flash("Entreprise supprimée.");
+    }
+    case "nouveau-contact": return ouvrirFormulaireContact();
   }
 });
 
 document.addEventListener("change", async (e) => {
-  const id = e.target.dataset?.etape;
-  if (!id) return;
-  const { error } = await sb.from("demande_candidats").update({ etape: e.target.value }).eq("demande_id", etat.demandeOuverte.d.id).eq("candidat_id", id);
-  if (error) return echec(error);
-  flash("Étape mise à jour.");
+  if (e.target.dataset?.faire) return marquerFait(e.target.dataset.faire);
+  const candidat = e.target.dataset?.etape;
+  if (candidat) return changerEtape(e.target.dataset.demande, candidat, e.target.value);
 });
 
 document.addEventListener("keydown", (e) => {

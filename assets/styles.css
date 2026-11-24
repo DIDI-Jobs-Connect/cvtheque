@@ -498,3 +498,142 @@ dialog[open] { animation: apparait var(--normal) var(--courbe); }
 
 .pied { text-align: center; padding: 0 1rem 2rem; font-size: 0.85rem; }
 .pied a { color: var(--encre-2); }
+
+/* ===================== CRM : tableau de bord, pipeline, entreprises, matching ===================== */
+button.lien { border: 0; background: none; padding: 0; font-weight: 700; color: var(--encre); cursor: pointer; text-decoration: underline; text-decoration-color: var(--trait); text-underline-offset: 3px; text-align: left; }
+button.lien:hover { text-decoration-color: var(--action); color: var(--action); }
+.tete-ligne { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.75rem; }
+.tete-ligne select { width: auto; min-height: 38px; }
+.sous-titre { margin-top: 1.4rem; }
+.panneau h2 + * { margin-top: 0.8rem; }
+.panneau .envoi { flex-wrap: wrap; justify-content: flex-start; margin-top: 1rem; }
+.vide.petit { padding: 1.25rem; }
+.vide.petit h2 { font-size: 1.1rem; }
+
+/* Tuiles de chiffres : des fiches cartonnées, chiffre en grand. */
+.tuiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.9rem; margin-bottom: 1.1rem; }
+.tuile { display: grid; gap: 0.15rem; padding: 1rem 1.1rem; text-align: left; border: 1px solid var(--trait); border-top: 4px solid var(--action); border-radius: var(--rayon); background: var(--papier); cursor: pointer; transition: transform var(--vite) var(--courbe), box-shadow var(--vite) var(--courbe); }
+.tuile:not([data-vue]) { cursor: default; }
+.tuile:nth-child(2) { border-top-color: var(--ambre); }
+.tuile:nth-child(3) { border-top-color: #7b3f8e; }
+.tuile:nth-child(4) { border-top-color: var(--ok); }
+.tuile[data-vue]:hover { transform: translateY(-2px); box-shadow: 0 10px 24px -16px rgba(11, 16, 38, 0.45); }
+.tuile b { font: 800 2.3rem/1 var(--titre); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.tuile span { font-weight: 700; }
+.tuile small { color: var(--encre-2); font-size: 0.85rem; }
+
+.bord { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
+.bord.deux-colonnes { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); margin-top: 1rem; }
+.bord .panneau h2 { font-size: 1.15rem; }
+.panneau-titre { display: flex; align-items: center; gap: 0.75rem; }
+.tampon.retard { color: var(--tampon); }
+
+/* Relances : une liste de choses à faire, cochables. */
+.relances { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.relance { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0.7rem; padding: 0.55rem 0.75rem; border-radius: 8px; background: var(--fond); border-left: 3px solid var(--trait); }
+.relance.jour { border-left-color: var(--ambre); }
+.relance.retard { border-left-color: var(--tampon); background: #fdf1f2; }
+.relance input { width: 20px; height: 20px; accent-color: var(--ok); cursor: pointer; }
+.relance-texte { display: grid; font-size: 0.93rem; }
+.relance-texte span { font-size: 0.85rem; color: var(--encre-2); }
+.relance-date { font-size: 0.82rem; font-weight: 700; color: var(--encre-2); white-space: nowrap; }
+.relance.retard .relance-date { color: var(--tampon); }
+.relance.jour .relance-date { color: #9a5b00; }
+.relances-poste { margin-top: 1rem; }
+.relances-poste h3 { font-size: 0.95rem; margin-bottom: 0.5rem; }
+
+/* Barres horizontales simples. */
+.barres { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.45rem; }
+.barres li { display: grid; grid-template-columns: minmax(110px, 38%) 1fr 2.2rem; align-items: center; gap: 0.6rem; font-size: 0.88rem; }
+.barres li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.barres i { display: block; height: 10px; border-radius: 99px; background: var(--fond); position: relative; overflow: hidden; }
+.barres i::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--w); border-radius: inherit; background: var(--c); animation: barre var(--lent) var(--courbe) both; }
+.barres b { text-align: right; font-variant-numeric: tabular-nums; }
+@keyframes barre { from { width: 0; } }
+.fiches.compactes .fiche .details { display: none; }
+
+/* Postes */
+.liste-postes { display: grid; gap: 0.5rem; }
+.details-poste { margin-top: 0.8rem; white-space: pre-wrap; color: var(--encre-2); font-size: 0.93rem; }
+.poste-tete { border-top: 4px solid var(--c, var(--action)); }
+
+/* Kanban : une colonne par étape, défilement horizontal. */
+.kanban { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(172px, 1fr); gap: 0.6rem; margin-top: 1rem; overflow-x: auto; padding-bottom: 0.5rem; scroll-snap-type: x proximity; }
+.colonne { display: flex; flex-direction: column; min-height: 220px; padding: 0.6rem; border-radius: var(--rayon); background: #e9edf8; scroll-snap-align: start; transition: background var(--vite) var(--courbe), box-shadow var(--vite) var(--courbe); }
+.colonne.survol { background: #dfe6ff; box-shadow: inset 0 0 0 2px var(--action); }
+.colonne h3 { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.2rem 0.3rem 0.6rem; border-bottom: 3px solid var(--etape, var(--encre-2)); margin-bottom: 0.6rem; }
+.colonne h3 span { font-variant-numeric: tabular-nums; background: var(--papier); border-radius: 99px; padding: 0 0.5rem; }
+.colonne.source { --etape: #8a93ad; }
+.colonne.contacte { --etape: var(--action); }
+.colonne.presente { --etape: var(--ambre); }
+.colonne.entretien { --etape: #7b3f8e; }
+.colonne.offre { --etape: #0e8a9a; }
+.colonne.place { --etape: var(--ok); background: #e4f3ea; }
+.colonne.refuse { --etape: #b9bccb; opacity: 0.85; }
+.cartes { display: grid; gap: 0.5rem; align-content: start; flex: 1; }
+.colonne-vide { font-size: 0.8rem; color: var(--encre-2); text-align: center; padding: 1rem 0.3rem; border: 1px dashed #c6cde3; border-radius: 8px; }
+.carte-pipeline { position: relative; display: grid; gap: 0.3rem; padding: 0.6rem 0.7rem; border-radius: 8px; background: var(--papier); border-left: 4px solid var(--c); box-shadow: 0 1px 2px rgba(11, 16, 38, 0.08); cursor: grab; transition: transform var(--vite) var(--courbe), opacity var(--vite); }
+.carte-pipeline:hover { transform: translateY(-1px); }
+.carte-pipeline.glisse { opacity: 0.45; transform: rotate(-2deg); }
+.carte-pipeline small { color: var(--encre-2); font-size: 0.8rem; line-height: 1.35; }
+.carte-pipeline select { min-height: 32px; font-size: 0.8rem; padding: 0.2rem 0.4rem; }
+
+/* Fenêtre large (matching) */
+dialog.large { width: min(860px, calc(100% - 2rem)); }
+#contenu-large { display: grid; gap: 1rem; padding: 1.5rem; }
+.large-tete { display: flex; align-items: center; gap: 1rem; }
+.large-tete h2 { font-size: 1.3rem; }
+.large-tete .bouton { margin-left: auto; }
+.matchs { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.matchs li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0.9rem; padding: 0.7rem 0.9rem; border-radius: 10px; background: var(--fond); border-left: 4px solid var(--c); }
+.match-score { --s: 0; display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: conic-gradient(var(--action) calc(var(--s) * 1%), var(--trait) 0); position: relative; }
+.match-score::before { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: var(--papier); }
+.match-score b, .match-score small { position: relative; line-height: 1; }
+.match-score b { font: 800 1.05rem var(--titre); margin-top: 0.35rem; }
+.match-score small { font-size: 0.6rem; color: var(--encre-2); margin-top: -0.6rem; }
+.match-qui { display: grid; gap: 0.15rem; }
+.match-qui small { color: var(--encre-2); font-size: 0.85rem; }
+.puces-raisons { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.2rem; }
+.puces-raisons span { font-size: 0.75rem; padding: 0.1rem 0.5rem; border-radius: 99px; background: var(--papier); border: 1px solid var(--trait); }
+
+/* Entreprises */
+.statut-entreprise { font-weight: 700; }
+.statut-entreprise.client { color: var(--ok) !important; }
+.statut-entreprise.prospect { color: #9a5b00 !important; }
+.chiffres-entreprise { margin-top: 0.7rem; color: var(--encre-2); }
+.chiffres-entreprise b { color: var(--encre); font-family: var(--titre); }
+.contacts { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.contacts li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; padding: 0.6rem 0.75rem; border-radius: 8px; background: var(--fond); }
+.contacts li > span:first-child { display: grid; }
+.contacts small { color: var(--encre-2); }
+.contact-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-left: auto; }
+
+/* Journal typé */
+.journal-ligne { display: grid; grid-template-columns: 150px 1fr; gap: 0.5rem; }
+.journal-ligne textarea { min-height: 70px; }
+.form-journal .envoi { justify-content: flex-end; }
+.type-activite { display: inline-block; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.05rem 0.45rem; border-radius: 4px; background: var(--trait); color: var(--encre); margin-right: 0.3rem; vertical-align: 1px; }
+.type-activite.appel { background: #e2e8ff; color: var(--action-fonce); }
+.type-activite.whatsapp { background: #dcf5e6; color: #146c3f; }
+.type-activite.email { background: #fff0d9; color: #8a4f00; }
+.type-activite.entretien { background: #f1e3f6; color: #6a2f7c; }
+.type-activite.rencontre { background: #dff3f5; color: #0b6a76; }
+.notes { margin-top: 0.8rem; }
+
+@media (max-width: 1100px) {
+  .tuiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bord, .bord.deux-colonnes { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+  .tuile b { font-size: 1.9rem; }
+  .journal-ligne { grid-template-columns: 1fr; }
+  .matchs li { grid-template-columns: auto 1fr; }
+  .matchs li .bouton { grid-column: 1 / -1; }
+  .kanban { grid-auto-columns: 78%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .barres i::after { animation: none; }
+  .tuile, .carte-pipeline { transition: none; }
+}
+.demandes > *, .contenu, #detail-poste, #detail-entreprise { min-width: 0; }
+.demande-carte small { display: block; }

@@ -3,7 +3,8 @@
 La CVthèque a deux pages :
 
 - **`index.html`** : le formulaire public où les candidats déposent leur CV (le lien à partager) ;
-- **`espace.html`** : l'espace privé de l'équipe (fiches, recherche, notes, demandes des recruteurs).
+- **`espace.html`** : l'espace privé de l'équipe, un vrai CRM de recruteur : tableau de bord et relances,
+  pipeline par poste (Kanban), entreprises clientes et matching automatique des profils.
 
 Le site est hébergé gratuitement sur **GitHub Pages**. Les CV et les fiches sont stockés dans
 **Supabase** (base de données et fichiers privés), car GitHub Pages ne sait pas garder des données
@@ -30,6 +31,12 @@ Règle d'or : ne collez jamais dans une conversation le mot de passe de la base,
 2. Copiez tout le contenu du fichier **`supabase/schema.sql`**, collez-le, cliquez sur **Run**.
 3. Le message « Success. No rows returned » confirme que tout est en place (tables, sécurité,
    dossier privé des CV).
+
+### 2 bis. Ajouter le module CRM
+
+Toujours dans **SQL Editor** → **New query** : copiez tout le contenu de **`supabase/crm.sql`**, collez,
+**Run**. Il ajoute les entreprises, les contacts, les relances, le pipeline par étapes et le tableau de
+bord. Vous pouvez le relancer sans risque : il ne supprime aucune donnée.
 
 ## 3. Créer votre compte d'accès
 
@@ -83,10 +90,19 @@ Le mot après `?source=` apparaît dans chaque fiche (« Provenance ») : vous s
 
 - **Trouver des profils** : tapez des mots dans la recherche (« comptable Cotonou », « Sage »,
   « anglais »). Les accents sont facultatifs. Combinez avec les filtres de gauche.
-- **Une recruteuse vous demande des profils** : **Demandes** → **Nouvelle demande** →
-  **Trouver des profils** → ouvrez une fiche → **Proposer pour cette demande**. Ensuite,
-  **Copier le message pour la recruteuse** prépare un message avec la liste et un lien vers chaque
-  CV (valable 7 jours), à coller dans WhatsApp ou un email.
+- **Tableau de bord** : vos chiffres, les relances du jour et en retard (cochez quand c'est fait), le
+  pipeline des postes ouverts et la provenance des CV.
+- **Une entreprise vous confie un recrutement** : **Entreprises** → **Nouvelle entreprise** (et ses
+  contacts), puis **Nouveau poste**. Notez chaque échange dans le **Journal** (appel, WhatsApp, rencontre…).
+- **Trouver les candidats** : sur le poste, **Profils compatibles** classe la CVthèque sur 100 (domaine,
+  intitulé, ville, expérience, contrat, disponibilité) → **Ajouter**. Ou **Chercher dans la CVthèque**
+  pour filtrer vous-même.
+- **Suivre le process** : glissez les cartes d'une colonne à l'autre (Sourcé → Contacté → Présenté au
+  client → Entretien → Offre → Placé), ou changez l'étape dans la liste sur téléphone. Le statut de la
+  fiche suit automatiquement.
+- **Envoyer la shortlist** : **Message pour le client** copie la liste des candidats présentés avec un
+  lien vers chaque CV (valable 7 jours), à coller dans WhatsApp ou un email.
+- **Ne rien oublier** : bouton **Relance** sur une fiche, un poste ou une entreprise (« rappeler jeudi »).
 - **Une personne redépose son CV** (même téléphone ou même email) : sa fiche est mise à jour,
   l'ancien CV reste dans l'historique.
 - **CV reçu sur WhatsApp** : **Ajouter une fiche**, puis joignez le fichier.
