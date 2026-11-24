@@ -1,9 +1,9 @@
-import { CONFIG } from "./config.js?v=6";
-import { sb, configuree, esc, sansAccents, envoyerCv } from "./client.js?v=6";
+import { CONFIG } from "./config.js?v=8";
+import { sb, configuree, esc, sansAccents, envoyerCv } from "./client.js?v=8";
 import {
   DOMAINES, CONTRATS, NIVEAUX, DISPONIBILITES, STATUTS, ETAPES, STATUTS_DEMANDE, TYPES_ACTIVITE, STATUTS_ENTREPRISE,
   couleurDomaine, libelleStatut, libelleEtape,
-} from "./listes.js?v=6";
+} from "./listes.js?v=8";
 
 const $ = (s) => document.querySelector(s);
 const PAR_PAGE = 40;
@@ -37,6 +37,8 @@ const etat = {
   entrepriseOuverte: null, // { e, contacts, postes, notes, relances }
   selectionPour: null, // poste pour lequel on cherche des profils dans la CVthèque
   demandesRecues: [], // demandes déposées par les entreprises sur la page « Vous recrutez ? »
+  recruteurs: [], // comptes de l'espace recruteur
+  aTraiter: { comptes: 0, demandes_cv: 0 },
 };
 const BASE = new URL("./", location.href).href;
 const DUREE_PARTAGE = 30 * 24 * 3600; // liens de CV du recruteur : 30 jours
@@ -86,7 +88,7 @@ async function afficherSession(session) {
   }
   $("#email-compte").textContent = session.user.email;
   ecran("appli");
-  await Promise.all([chargerDemandes(), chargerEntreprises(), chargerDemandesRecues()]);
+  await Promise.all([chargerDemandes(), chargerEntreprises(), chargerDemandesRecues(), chargerATraiter(), chargerRecruteurs()]);
   rendreFiltres();
   changerVue("accueil");
 }
@@ -154,12 +156,24 @@ function changerVue(vue) {
   if (vue === "fiches") return chargerFiches();
   if (vue === "postes") return rendrePostes();
   if (vue === "entreprises") return chargerDemandesRecues().then(rendreEntreprises);
+  if (vue === "recruteurs") return chargerRecruteursVue();
 }
 
 // =====================================================================
 // Tableau de bord
 // =====================================================================
+async function chargerATraiter() {
+  const { data, error } = await sb.rpc("a_traiter_recruteurs");
+  etat.aTraiter = error || !data ? { comptes: 0, demandes_cv: 0 } : data;
+  const bouton = document.querySelector('.vues button[data-vue="recruteurs"]');
+  if (!bouton) return;
+  bouton.querySelector(".pastille")?.remove();
+  const n = etat.aTraiter.comptes + etat.aTraiter.demandes_cv;
+  if (n) bouton.insertAdjacentHTML("beforeend", `<span class="pastille" aria-label="${n} à traiter">${n}</span>`);
+}
+
 async function chargerAccueil() {
+  chargerATraiter();
   const [bord, relances, derniers] = await Promise.all([
     sb.rpc("tableau_de_bord"),
     sb.from("relances").select("*, candidats(id, prenom, nom), entreprises(id, nom), demandes(id, titre)").eq("fait", false).order("echeance").limit(40),
@@ -255,6 +269,9 @@ function alertes() {
   const lignes = [];
   if (b.demandes_entreprises) lignes.push(`<li class="relance jour"><span>✦</span><span class="relance-texte"><b>${b.demandes_entreprises} ${pluriel(b.demandes_entreprises, "nouvelle demande d'entreprise", "nouvelles demandes d'entreprises")}</b><span><button type="button" class="lien" data-vue="entreprises">Voir les demandes</button></span></span><span class="relance-date">À traiter</span></li>`);
   if (b.candidatures_7j) lignes.push(`<li class="relance"><span>✉</span><span class="relance-texte"><b>${b.candidatures_7j} ${pluriel(b.candidatures_7j, "candidature reçue", "candidatures reçues")} sur vos offres</b><span><button type="button" class="lien" data-vue="postes">Voir les postes</button></span></span><span class="relance-date">7 derniers jours</span></li>`);
+  const t = etat.aTraiter;
+  if (t.comptes) lignes.push(`<li class="relance jour"><span>✦</span><span class="relance-texte"><b>${t.comptes} ${pluriel(t.comptes, "compte recruteur à valider", "comptes recruteurs à valider")}</b><span><button type="button" class="lien" data-vue="recruteurs">Ouvrir</button></span></span><span class="relance-date">À traiter</span></li>`);
+  if (t.demandes_cv) lignes.push(`<li class="relance jour"><span>✦</span><span class="relance-texte"><b>${t.demandes_cv} ${pluriel(t.demandes_cv, "demande de CV d'un recruteur", "demandes de CV de recruteurs")}</b><span><button type="button" class="lien" data-vue="recruteurs">Ouvrir</button></span></span><span class="relance-date">À traiter</span></li>`);
   return lignes.length ? `<ul class="relances" style="margin-bottom:.4rem">${lignes.join("")}</ul>` : "";
 }
 
@@ -930,6 +947,7 @@ function ouvrirFormulairePoste(d = null, entrepriseId = null) {
       <label class="champ"><span>Nombre de postes</span><input type="number" min="1" max="99" name="nb_postes" value="${d?.nb_postes ?? 1}"></label>
       <label class="champ"><span>À pourvoir avant le</span><input type="date" name="echeance" value="${v("echeance")}"></label>
     </div>
+    ${etat.recruteurs.some((r) => r.statut === "valide") ? `<label class="champ"><span>Compte recruteur qui suit ce poste <small>(il verra les candidats présentés dans son espace)</small></span><select name="recruteur_id">${options(etat.recruteurs.filter((r) => r.statut === "valide").map((r) => [r.user_id, `${r.nom}, ${r.entreprise}`]), "Aucun", d?.recruteur_id ?? d?.recruteur_id_brouillon ?? null)}</select></label>` : ""}
     <label class="champ"><span>Détails du besoin <small>(visibles par tous si l'offre est publiée : retirez le nom du client si besoin)</small></span><textarea name="details" placeholder="Missions, diplôme, horaires, avantages…">${v("details")}</textarea></label>
     ${brouillon && d.entreprise_nom && !d.entreprise_id ? `<p class="aide">Entreprise repérée dans le texte : <b>${esc(d.entreprise_nom)}</b>. Elle n'est pas encore dans vos entreprises.</p>` : `<p class="aide">Pas encore l'entreprise dans la liste ? Créez-la d'abord dans l'onglet Entreprises.</p>`}
     <div class="cases">
@@ -945,6 +963,7 @@ function ouvrirFormulairePoste(d = null, entrepriseId = null) {
     };
     if (!champs.titre) return "Indiquez l'intitulé du poste.";
     champs.publique = f.get("publique") === "on";
+    if (f.has("recruteur_id")) champs.recruteur_id = val(f, "recruteur_id");
     champs.afficher_entreprise = f.get("afficher_entreprise") === "on";
     if (champs.publique && !d?.publiee_le) champs.publiee_le = new Date().toISOString();
     if (!edition && d?.demande_recue_id) champs.client = d.client ?? null;
@@ -1159,6 +1178,67 @@ async function chargerEntreprises() {
   if (!error) etat.entreprises = data;
 }
 
+// =====================================================================
+// Recruteurs (comptes de l'espace recruteur, demandes de CV)
+// =====================================================================
+async function chargerRecruteurs() {
+  const { data, error } = await sb.from("recruteurs").select("*, entreprises(nom)").order("cree_le", { ascending: false });
+  if (!error) etat.recruteurs = data;
+}
+
+async function chargerRecruteursVue() {
+  const [, demandes] = await Promise.all([
+    chargerRecruteurs(),
+    sb.from("acces_cv").select("id, cree_le, statut, message, recruteur_id, candidat_id, candidats(id, prenom, nom, postes, domaine, cv_chemin), recruteurs(nom, entreprise)").order("cree_le", { ascending: false }).limit(200),
+    chargerATraiter(),
+  ]);
+  if (demandes.error) {
+    $("#contenu").innerHTML = `<div class="vide"><h2>Le module « Espace recruteur » n'est pas encore installé</h2><p>Dans Supabase, <b>SQL Editor</b> → <b>New query</b>, collez le contenu de <code>supabase/recruteurs.sql</code> puis <b>Run</b>.</p></div>`;
+    return;
+  }
+  const attente = etat.recruteurs.filter((r) => r.statut === "en_attente");
+  const valides = etat.recruteurs.filter((r) => r.statut !== "en_attente");
+  const enCours = demandes.data.filter((a) => a.statut === "demande");
+  const traitees = demandes.data.filter((a) => a.statut !== "demande").slice(0, 30);
+  const ligneDemande = (a) => `<li class="demande-recue ${a.statut === "demande" ? "" : "contactee"}">
+      <div class="demande-recue-tete"><b>${esc(a.recruteurs?.entreprise)}</b><span>${esc(a.recruteurs?.nom)}</span>
+        <span class="aide">demande le CV de</span><button type="button" class="lien" data-fiche="${a.candidat_id}">${esc(a.candidats?.prenom)} ${esc(a.candidats?.nom)}</button>
+        <span class="aide">${esc(a.candidats?.postes)}, le ${jour(a.cree_le)}</span>
+        ${a.statut !== "demande" ? `<span class="tampon ${a.statut === "accorde" ? "place" : "archive"}">${a.statut === "accorde" ? "Accordé" : "Refusé"}</span>` : ""}</div>
+      ${a.message ? `<p class="details-poste" style="margin:0">${esc(a.message)}</p>` : ""}
+      ${!a.candidats?.cv_chemin && a.statut === "demande" ? `<p class="aide">Ce candidat n'a pas encore de CV : relancez-le avant d'accorder.</p>` : ""}
+      <div class="envoi">${a.statut === "demande"
+        ? `<button type="button" class="bouton petit" data-acces="${a.id}" data-acces-statut="accorde">Accorder le CV</button><button type="button" class="bouton discret petit" data-acces="${a.id}" data-acces-statut="refuse">Refuser</button>`
+        : `<button type="button" class="bouton discret petit" data-acces="${a.id}" data-acces-statut="${a.statut === "accorde" ? "refuse" : "accorde"}">${a.statut === "accorde" ? "Retirer l'accès" : "Accorder finalement"}</button>`}</div>
+    </li>`;
+  $("#contenu").innerHTML = `
+    <div class="resume"><h1>Recruteurs</h1><div class="outils"><a class="bouton discret petit" href="${BASE}espace-recruteur.html" target="_blank" rel="noopener">Ouvrir l'espace recruteur</a><button type="button" class="bouton petit secondaire" data-action="copier-lien-espace-recruteur">Copier le lien d'inscription</button></div></div>
+    <div class="bord deux-colonnes" style="margin-top:0">
+      <section class="panneau">
+        <div class="panneau-titre"><h2>Comptes à valider</h2>${attente.length ? `<span class="tampon retard">${attente.length}</span>` : ""}</div>
+        ${attente.length ? `<ul class="demandes-recues" style="list-style:none;padding:0">${attente.map((r) => `<li class="demande-recue">
+            <div class="demande-recue-tete"><b>${esc(r.nom)}</b><span>${esc(r.entreprise)}</span><span class="aide">${esc(r.fonction || "")}</span></div>
+            <p class="aide">${esc(r.email)}${r.telephone ? `, ${esc(r.telephone)}` : ""} · inscrit(e) le ${jour(r.cree_le)}</p>
+            <label class="champ"><span>Rattacher à une entreprise <small>(facultatif)</small></span><select data-rattacher="${r.user_id}">${options(etat.entreprises.map((e) => [e.id, e.nom]), "Aucune", r.entreprise_id)}</select></label>
+            <div class="envoi">
+              <button type="button" class="bouton petit" data-compte="${r.user_id}" data-compte-statut="valide">Valider l'accès</button>
+              ${numeroWhatsapp(r.telephone) ? `<a class="bouton secondaire petit" target="_blank" rel="noopener" href="https://wa.me/${numeroWhatsapp(r.telephone)}">WhatsApp</a>` : ""}
+              <button type="button" class="bouton discret petit" data-compte="${r.user_id}" data-compte-statut="suspendu">Refuser</button>
+            </div></li>`).join("")}</ul>` : `<p class="aide">Aucun compte en attente. Partagez le lien d'inscription aux recruteurs avec qui vous travaillez.</p>`}
+        <h2 class="sous-titre">Comptes</h2>
+        ${valides.length ? `<ul class="contacts">${valides.map((r) => `<li><span><b>${esc(r.nom)}</b><small>${esc(r.entreprise)}${r.entreprises?.nom ? ` (${esc(r.entreprises.nom)})` : ""} · ${esc(r.email)}</small></span>
+            <span class="contact-actions"><span class="tampon ${r.statut === "valide" ? "place" : "archive"}">${r.statut === "valide" ? "Actif" : "Suspendu"}</span>
+            <button type="button" class="bouton discret petit" data-compte="${r.user_id}" data-compte-statut="${r.statut === "valide" ? "suspendu" : "valide"}">${r.statut === "valide" ? "Suspendre" : "Réactiver"}</button></span></li>`).join("")}</ul>` : `<p class="aide">Aucun compte validé pour l'instant.</p>`}
+      </section>
+      <section class="panneau">
+        <div class="panneau-titre"><h2>Demandes de CV</h2>${enCours.length ? `<span class="tampon retard">${enCours.length}</span>` : ""}</div>
+        <p class="aide">Les recruteurs parcourent la CVthèque anonyme et demandent des CV. Rien n'est visible avant votre accord.</p>
+        ${enCours.length ? `<ul class="demandes-recues" style="list-style:none;padding:0;margin-top:.8rem">${enCours.map(ligneDemande).join("")}</ul>` : `<p class="aide" style="margin-top:.8rem">Aucune demande en attente.</p>`}
+        ${traitees.length ? `<h2 class="sous-titre">Déjà traitées</h2><ul class="demandes-recues" style="list-style:none;padding:0">${traitees.map(ligneDemande).join("")}</ul>` : ""}
+      </section>
+    </div>`;
+}
+
 // ---------- Demandes reçues des entreprises (page « Vous recrutez ? ») ----------
 async function chargerDemandesRecues() {
   const { data, error } = await sb.from("demandes_entreprises").select("*").in("statut", ["nouvelle", "contactee"]).order("cree_le", { ascending: false }).limit(50);
@@ -1217,6 +1297,7 @@ async function convertirDemande(id) {
     details: [r.formule ? `Formule : ${r.formule}` : "", r.details].filter(Boolean).join("\n\n"),
     domaine: analyserOffre(`${r.poste}\n${r.details || ""}`).domaine,
     demande_recue_id: r.id,
+    recruteur_id_brouillon: r.recruteur_id || null,
   });
 }
 
@@ -1408,6 +1489,20 @@ document.addEventListener("click", async (e) => {
     return ouvrirPoste(etat.posteOuvert.d.id);
   }
   if (ds.convertir) return convertirDemande(ds.convertir);
+  if (ds.compte) {
+    const champs = { statut: ds.compteStatut, ...(ds.compteStatut === "valide" ? { valide_le: new Date().toISOString() } : {}) };
+    if (ds.compteStatut === "suspendu" && !confirm("Couper l'accès de ce compte à l'espace recruteur ?")) return;
+    const { error } = await sb.from("recruteurs").update(champs).eq("user_id", ds.compte);
+    if (error) return echec(error);
+    flash(ds.compteStatut === "valide" ? "Compte validé : le recruteur peut se connecter." : "Accès coupé.");
+    return chargerRecruteursVue();
+  }
+  if (ds.acces) {
+    const { error } = await sb.from("acces_cv").update({ statut: ds.accesStatut, decide_le: new Date().toISOString() }).eq("id", ds.acces);
+    if (error) return echec(error);
+    flash(ds.accesStatut === "accorde" ? "CV accordé : le recruteur le voit dans son espace." : "Accès refusé.");
+    return chargerRecruteursVue();
+  }
   if (ds.recue) {
     if (ds.recueStatut === "refusee" && !confirm("Classer cette demande sans suite ?")) return;
     const { error } = await sb.from("demandes_entreprises").update({ statut: ds.recueStatut }).eq("id", ds.recue);
@@ -1476,6 +1571,7 @@ document.addEventListener("click", async (e) => {
     }
     case "matching": return matching();
     case "importer-offre": return ouvrirImportOffre();
+    case "copier-lien-espace-recruteur": return copier(`${BASE}espace-recruteur.html`, "Lien de l'espace recruteur copié : partagez-le aux recruteurs.");
     case "copier-lien-offre": return copier(lienOffre(etat.posteOuvert.d), "Lien copié : les candidats arrivent directement sur ce poste.");
     case "creer-lien-recruteur": {
       const d = etat.posteOuvert.d;
@@ -1539,6 +1635,10 @@ document.addEventListener("click", async (e) => {
 });
 
 document.addEventListener("change", async (e) => {
+  if (e.target.dataset?.rattacher) {
+    const { error } = await sb.from("recruteurs").update({ entreprise_id: e.target.value || null }).eq("user_id", e.target.dataset.rattacher);
+    return error ? echec(error) : flash("Rattachement enregistré.");
+  }
   if (e.target.dataset?.faire) return marquerFait(e.target.dataset.faire);
   const candidat = e.target.dataset?.etape;
   if (candidat) return changerEtape(e.target.dataset.demande, candidat, e.target.value);

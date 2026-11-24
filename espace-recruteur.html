@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Espace recruteur</title>
+  <meta name="description" content="Espace recruteur DIDI Jobs Connect : vos postes, les profils présélectionnés et la CVthèque.">
+  <meta name="theme-color" content="#4263f0">
+  <link rel="icon" href="assets/brand/icon.png">
+  <link rel="stylesheet" href="assets/styles.css?v=8">
+</head>
+<body class="page-recruteur">
+  <header class="barre-recruteur">
+    <a href="./recruter.html"><img src="assets/brand/logo.png?v=4" alt="Didi Job Connect" width="86" height="40"></a>
+    <nav class="onglets-recruteur" id="onglets" hidden aria-label="Espace recruteur">
+      <button type="button" data-onglet="postes" aria-current="page">Mes postes</button>
+      <button type="button" data-onglet="cvtheque">CVthèque</button>
+      <button type="button" data-onglet="accordes">CV accordés</button>
+      <button type="button" data-onglet="demande">Nouvelle demande</button>
+    </nav>
+    <span class="compte-recruteur"><span class="aide" id="email-recruteur"></span>
+      <button type="button" class="bouton discret petit" id="deconnexion" hidden>Se déconnecter</button></span>
+  </header>
+  <main class="page-publique" id="contenu-recruteur"><p class="aide">Chargement…</p></main>
+  <dialog id="fenetre-recruteur"><form id="form-recruteur" method="dialog" novalidate></form></dialog>
+  <div id="flash" class="message-flash" role="status" hidden></div>
+  <script type="module" src="assets/espace-recruteur.js?v=8"></script>
+</body>
+</html>

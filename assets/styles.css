@@ -756,3 +756,23 @@ dialog.large { width: min(860px, calc(100% - 2rem)); }
 .poste-tete .details-poste { max-height: 9.5em; overflow: auto; padding-right: 0.5rem; }
 .relance-cv li.faite { opacity: 0.55; }
 .relance-cv li.faite .bouton { background: var(--ok); }
+
+/* ===================== Espace recruteur (comptes) ===================== */
+.onglets-recruteur { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.onglets-recruteur button { border: 0; background: none; padding: 0.5rem 0.8rem; border-radius: 8px; font-weight: 700; cursor: pointer; color: var(--encre-2); }
+.onglets-recruteur button[aria-current="page"] { background: var(--encre); color: #fff; }
+.compte-recruteur { display: flex; align-items: center; gap: 0.6rem; }
+.connexion-recruteur { margin-top: 1rem; max-width: 640px; }
+.connexion-recruteur form { display: grid; gap: 1rem; margin-top: 1rem; }
+.choix-connexion { display: flex; gap: 0.3rem; padding: 0.3rem; border-radius: 10px; background: var(--fond); width: fit-content; }
+.choix-connexion button { border: 0; background: none; padding: 0.5rem 0.9rem; border-radius: 8px; font-weight: 700; cursor: pointer; color: var(--encre-2); }
+.choix-connexion button[aria-selected="true"] { background: var(--papier); color: var(--encre); box-shadow: 0 1px 3px rgba(11, 16, 38, 0.12); }
+.info-connexion { margin-top: 1rem; padding: 0.8rem 1rem; border-radius: 8px; background: #e2e8ff; color: var(--action-fonce); font-weight: 600; }
+.bloc-poste { margin-top: 1.5rem; }
+.bloc-poste-tete { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem 1rem; padding-bottom: 0.4rem; border-bottom: 2px solid var(--trait); }
+.bloc-poste-tete h2 { font-size: 1.3rem; }
+@media (max-width: 640px) {
+  .barre-recruteur { flex-wrap: wrap; }
+  .onglets-recruteur { order: 3; width: 100%; overflow-x: auto; flex-wrap: nowrap; }
+  .onglets-recruteur button { white-space: nowrap; }
+}

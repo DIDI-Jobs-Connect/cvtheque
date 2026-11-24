@@ -7,7 +7,7 @@
   <title>CVthèque, espace recruteur</title>
   <link rel="icon" href="assets/brand/icon.png">
   <meta name="theme-color" content="#4263f0">
-  <link rel="stylesheet" href="assets/styles.css?v=7">
+  <link rel="stylesheet" href="assets/styles.css?v=8">
 </head>
 <body>
   <div id="config-manquante" class="config-manquante" hidden>
@@ -32,6 +32,7 @@
     <div class="panneau">
       <h1>Accès non autorisé</h1>
       <p>Le compte <b id="email-refuse"></b> n'est pas membre de l'équipe. Demandez à l'administrateur de l'ajouter.</p>
+      <p style="margin-top:.6rem">Vous êtes recruteur ? Votre espace est ici : <a href="espace-recruteur.html">espace recruteur</a>.</p>
       <p style="margin-top:1rem"><button class="bouton discret" type="button" data-action="deconnexion">Se déconnecter</button></p>
     </div>
   </main>
@@ -46,6 +47,7 @@
         <button type="button" data-vue="fiches">Candidats</button>
         <button type="button" data-vue="postes">Postes</button>
         <button type="button" data-vue="entreprises">Entreprises</button>
+        <button type="button" data-vue="recruteurs">Recruteurs</button>
       </nav>
       <label class="recherche"><span class="visuellement-cache">Rechercher</span>
         <input type="search" id="recherche" placeholder="Rechercher : comptable Cotonou, Sage, anglais…" autocomplete="off">
@@ -68,6 +70,6 @@
   <dialog id="fenetre-large" class="large"><div id="contenu-large"></div></dialog>
   <div id="flash" class="message-flash" role="status" hidden></div>
 
-  <script type="module" src="assets/espace.js?v=7"></script>
+  <script type="module" src="assets/espace.js?v=8"></script>
 </body>
 </html>

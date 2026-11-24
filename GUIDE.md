@@ -42,6 +42,18 @@ bord. Vous pouvez le relancer sans risque : il ne supprime aucune donnée.
 
 Même chose avec **`supabase/offres.sql`** (après `crm.sql`) : **New query**, coller, **Run**.
 
+### 2 quater. Ajouter l'espace recruteurs
+
+1. **SQL Editor** → **New query** : collez **`supabase/recruteurs.sql`** → **Run**.
+2. **Authentication** → **Sign In / Providers** :
+   - activez **Allow new users to sign up** (les recruteurs créent leur compte ; ils ne voient
+     rien tant que vous ne les avez pas validés, et n'ont jamais accès à l'espace équipe) ;
+   - dans **Email**, désactivez **Confirm email** (la validation se fait par vous ; l'envoi
+     d'emails gratuit de Supabase est limité à quelques emails par heure).
+3. **Authentication** → **URL Configuration** → **Site URL** :
+   `https://didi-jobs-connect.github.io/cvtheque/espace-recruteur.html` (lien des emails
+   « mot de passe oublié »).
+
 ## 3. Créer votre compte d'accès
 
 1. Menu de gauche → **Authentication** → **Sign In / Providers** : désactivez
@@ -86,6 +98,7 @@ branche **main**, dossier **/ (root)** → **Save**. Après 1 à 2 minutes, l'ad
 | Même formulaire, pour les personnes que vous accompagnez | `https://didi-jobs-connect.github.io/cvtheque/?source=accompagnement` |
 | Page des offres (à partager) | `https://didi-jobs-connect.github.io/cvtheque/offres.html` |
 | Page entreprises « Vous recrutez ? » | `https://didi-jobs-connect.github.io/cvtheque/recruter.html` |
+| Espace recruteur (comptes validés) | `https://didi-jobs-connect.github.io/cvtheque/espace-recruteur.html` |
 | Espace équipe (privé) | `https://didi-jobs-connect.github.io/cvtheque/espace.html` |
 
 Le mot après `?source=` apparaît dans chaque fiche (« Provenance ») : vous savez d'où vient chaque CV.
@@ -122,6 +135,12 @@ Le mot après `?source=` apparaît dans chaque fiche (« Provenance ») : vous s
   au-delà), ouvre leur CV (liens valables 30 jours) et répond « Je veux le/la rencontrer », « En
   réserve » ou « Pas retenu ». Son avis s'affiche sur la carte ; s'il veut rencontrer quelqu'un, une
   relance est créée pour vous. Il ne voit ni téléphone ni email. **Couper le lien** le désactive.
+- **Espace recruteur** : partagez `espace-recruteur.html` aux recruteurs. Ils créent leur compte,
+  puis **Recruteurs** (espace équipe) → **Valider l'accès**. Un recruteur validé voit :
+  ses postes (choisissez son compte dans le formulaire du poste) avec les candidats que vous
+  présentez, et la CVthèque **anonyme** (sans nom, contact ni CV). Il clique « Demander le CV » :
+  la demande arrive dans **Recruteurs** → **Demandes de CV** → **Accorder le CV** ou **Refuser**.
+  Il ne voit jamais le téléphone ni l'email des candidats.
 - **Ne rien oublier** : bouton **Relance** sur une fiche, un poste ou une entreprise (« rappeler jeudi »).
 - **Une personne redépose son CV** (même téléphone ou même email) : sa fiche est mise à jour,
   l'ancien CV reste dans l'historique.
