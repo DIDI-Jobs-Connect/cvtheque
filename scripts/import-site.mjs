@@ -15,6 +15,10 @@ import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 
 const { SITE_DATABASE_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env;
+// Sur GitHub, les erreurs s'affichent aussi en haut de la page du résumé.
+const erreurInitiale = console.error;
+console.error = (...m) => erreurInitiale(process.env.GITHUB_ACTIONS ? "::error::" + m.join(" ") : m.join(" "));
+process.on("unhandledRejection", (err) => { console.error(`Erreur inattendue : ${err?.code || ""} ${String(err?.message || err).replace(/postgres(ql)?:\/\/\S+/g, "[adresse masquée]")}`); process.exit(1); });
 const ESSAI = (process.env.ESSAI || "oui").toLowerCase() !== "non";
 for (const [k, v] of Object.entries({ SITE_DATABASE_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY })) {
   if (!v) { console.error(`Secret manquant : ${k}`); process.exit(1); }
