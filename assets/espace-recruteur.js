@@ -26,6 +26,7 @@ const infos = (p) => [p.ville, p.experience != null ? `${p.experience} an${p.exp
 // =====================================================================
 function ecranConnexion(mode = "connexion", message = "") {
   $("#onglets").hidden = true;
+  $("#liens-publics").hidden = false;
   $("#deconnexion").hidden = true;
   $("#email-recruteur").textContent = "";
   const creation = mode === "creation";
@@ -35,9 +36,10 @@ function ecranConnexion(mode = "connexion", message = "") {
       <h1>${creation ? "Créer votre compte recruteur" : "Accéder à votre espace recruteur"}</h1>
       <p class="aide">Retrouvez les profils présélectionnés pour vos postes, parcourez notre CVthèque et demandez les CV qui vous intéressent. Chaque compte est validé par notre équipe.</p>
     </section>
+    <div class="acces-recruteur">
     <div class="etape connexion-recruteur">
       <div class="choix-connexion" role="tablist">
-        <button type="button" role="tab" data-mode="connexion" aria-selected="${!creation}">J'ai déjà un compte</button>
+        <button type="button" role="tab" data-mode="connexion" aria-selected="${!creation}">Se connecter</button>
         <button type="button" role="tab" data-mode="creation" aria-selected="${creation}">Créer un compte</button>
       </div>
       ${message ? `<p class="info-connexion">${message}</p>` : ""}
@@ -56,6 +58,17 @@ function ecranConnexion(mode = "connexion", message = "") {
         </div>
         <p class="erreur" id="erreur-acces" role="alert"></p>
       </form>
+    </div>
+    <aside class="apercu-recruteur" aria-labelledby="titre-apercu">
+      <h2 id="titre-apercu">${creation ? "Comment ça marche" : "Pas encore de compte ?"}</h2>
+      <ol class="etapes-recrutement compact">
+        <li><b>Vous créez votre compte</b><span>Nom, entreprise, téléphone et email : 2&nbsp;minutes.</span></li>
+        <li><b>Notre équipe le valide</b><span>Nous vérifions chaque compte recruteur avant de l'ouvrir.</span></li>
+        <li><b>Vous recrutez</b><span>Décrivez vos postes, recevez les profils présélectionnés avec CV et coordonnées, parcourez la CVthèque.</span></li>
+      </ol>
+      ${creation ? `<p class="aide">Créer un compte ne vous engage à rien. Les tarifs ne s'appliquent qu'au recrutement que vous nous confiez : <a href="recruter.html">voir nos formules</a>.</p>`
+        : `<p><button type="button" class="bouton secondaire" data-mode="creation">Créer mon compte recruteur</button></p>`}
+    </aside>
     </div>`;
   zone.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", () => ecranConnexion(b.dataset.mode)));
   $("#oubli")?.addEventListener("click", motDePasseOublie);
@@ -130,7 +143,7 @@ function nouveauMotDePasse() {
 // Compte : en attente, suspendu, validé
 // =====================================================================
 async function afficher(session) {
-  if (!session) return ecranConnexion();
+  if (!session) return ecranConnexion(location.hash === "#inscription" ? "creation" : "connexion");
   $("#email-recruteur").textContent = session.user.email;
   $("#deconnexion").hidden = false;
   let { data: compte, error } = await sb.rpc("mon_compte_recruteur");
@@ -170,6 +183,7 @@ async function afficher(session) {
     return;
   }
   $("#onglets").hidden = false;
+  $("#liens-publics").hidden = true;
   changerOnglet(etat.onglet);
 }
 

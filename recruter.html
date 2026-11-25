@@ -10,7 +10,7 @@
   <meta property="og:image" content="assets/brand/logo.png?v=4">
   <meta name="theme-color" content="#4263f0">
   <link rel="icon" href="assets/brand/icon.png">
-  <link rel="stylesheet" href="assets/styles.css?v=13">
+  <link rel="stylesheet" href="assets/styles.css?v=14">
 </head>
 <body>
   <header class="hero court">
@@ -25,8 +25,11 @@
         </nav>
       </div>
       <h1 class="titre-public">Vous cherchez un profil ?<br>Il est peut-être déjà dans notre CVthèque.</h1>
-      <p class="sous-titre-public">Recruteur partenaire ? <a href="espace-recruteur.html" style="color:#ffb84d;font-weight:700">Accédez à votre espace</a> pour suivre vos postes et parcourir la CVthèque.<br>Décrivez le poste. Nous sélectionnons les candidats, vérifions leur dossier par téléphone et vous envoyons une shortlist prête à convoquer.</p>
-      
+      <p class="sous-titre-public">Décrivez le poste. Nous sélectionnons les candidats, vérifions leur dossier par téléphone et vous envoyons une shortlist prête à convoquer.</p>
+      <div class="actions-hero">
+        <a class="bouton accent" href="#zone-demande">Décrire mon besoin</a>
+        <a class="bouton contour-clair" href="espace-recruteur.html#inscription">Créer mon espace recruteur</a>
+      </div>
     </div>
   </header>
   <main class="page-publique">
@@ -35,12 +38,23 @@
       <div class="formules" id="formules"></div>
     </section>
 
+    <section class="comment-marche" aria-labelledby="titre-etapes">
+      <h2 class="titre-section" id="titre-etapes">Comment ça se passe</h2>
+      <ol class="etapes-recrutement">
+        <li><b>Vous décrivez le poste</b><span>Avec le formulaire ci-dessous, ou depuis votre espace recruteur si vous avez un compte.</span></li>
+        <li><b>Nous présélectionnons</b><span>Nous cherchons dans la CVthèque et parmi les candidatures, puis nous appelons chaque candidat pour vérifier son dossier et sa disponibilité.</span></li>
+        <li><b>Vous recevez les profils</b><span>CV et coordonnées dans votre espace recruteur. Vous indiquez qui vous voulez rencontrer, nous organisons la suite.</span></li>
+      </ol>
+      <p class="aide">Vous recrutez souvent ? <a href="espace-recruteur.html#inscription">Créez votre espace recruteur</a> pour suivre tous vos postes, parcourir la CVthèque et demander directement les CV qui vous intéressent.</p>
+    </section>
+
     <section class="etape demande-entreprise" id="zone-demande" aria-labelledby="titre-demande">
       <span class="etape-titre"><b>✎</b><h2 id="titre-demande">Votre demande de profils</h2></span>
       <form id="form-demande" novalidate>
         <div class="champ"><span id="titre-formule">Formule souhaitée</span>
           <div class="cases" id="choix-formule" role="radiogroup" aria-labelledby="titre-formule"></div>
         </div>
+        <fieldset class="bloc-form"><legend>Le poste</legend>
         <div class="grille deux">
           <label class="champ"><span>Poste à pourvoir</span><input type="text" name="poste" required maxlength="200" placeholder="Ex. : Comptable confirmé(e)"></label>
           <label class="champ"><span>Nombre de postes</span><input type="number" name="nb_postes" min="1" max="99" value="1"></label>
@@ -52,16 +66,20 @@
         <label class="champ"><span>Missions et profil recherché</span>
           <textarea name="details" maxlength="3000" placeholder="Missions, diplôme, compétences indispensables, horaires, lieu de travail…"></textarea>
         </label>
+        </fieldset>
+        <fieldset class="bloc-form"><legend>Votre entreprise et vos coordonnées</legend>
         <div class="grille deux">
           <label class="champ"><span>Entreprise</span><input type="text" name="entreprise" required maxlength="160" autocomplete="organization"></label>
           <label class="champ"><span>Secteur <small>(facultatif)</small></span><input type="text" name="secteur" maxlength="120" placeholder="Ex. : BTP, commerce, ONG"></label>
+          <label class="champ"><span>Ville</span><input type="text" name="ville" maxlength="80" placeholder="Ex. : Cotonou"></label>
           <label class="champ"><span>Votre nom</span><input type="text" name="contact_nom" required maxlength="120" autocomplete="name"></label>
           <label class="champ"><span>Votre fonction <small>(facultatif)</small></span><input type="text" name="fonction" maxlength="120" placeholder="Ex. : DRH, gérant(e)"></label>
           <label class="champ"><span>Téléphone (WhatsApp)</span><input type="tel" name="telephone" required maxlength="40" autocomplete="tel"></label>
           <label class="champ"><span>Email <small>(facultatif)</small></span><input type="email" name="email" maxlength="160" autocomplete="email"></label>
-          <label class="champ"><span>Ville</span><input type="text" name="ville" maxlength="80" placeholder="Ex. : Cotonou"></label>
         </div>
+        </fieldset>
         <label class="piege" aria-hidden="true">Site web <input type="text" name="site_web" tabindex="-1" autocomplete="off"></label>
+        <p class="aide rassurance">Envoyer une demande ne vous engage à rien : nous vous appelons pour préciser le besoin et confirmer la formule avant de lancer la recherche. Vos informations restent confidentielles.</p>
         <div class="envoi">
           <button class="bouton" type="submit" id="bouton-demande">Envoyer ma demande</button>
           <p class="erreur" id="erreur-demande" role="alert"></p>
@@ -76,6 +94,6 @@
     </section>
   </main>
   <footer class="pied"><a href="espace.html">Espace équipe</a></footer>
-  <script type="module" src="assets/recruter.js?v=17"></script>
+  <script type="module" src="assets/recruter.js?v=18"></script>
 </body>
 </html>
