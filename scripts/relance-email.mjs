@@ -21,6 +21,20 @@ const erreur = (m) => console.error(process.env.GITHUB_ACTIONS ? `::error::${m}`
 for (const [k, v] of Object.entries({ SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY: CLE, ...(ESSAI ? {} : { RESEND_API_KEY: RESEND, EMAIL_FROM: FROM }) })) {
   if (!v) { erreur(`Secret manquant : ${k}`); process.exit(1); }
 }
+// Vérification de l'adresse d'expédition avant tout envoi.
+if (!ESSAI) {
+  const adresse = (FROM.match(/<([^<>]+)>\s*$/) || [null, FROM])[1].trim();
+  const nomAffiche = FROM.includes("<") ? FROM.slice(0, FROM.indexOf("<")).trim() : "";
+  const probleme = /[\r\n]/.test(FROM) ? "elle contient un retour à la ligne (plusieurs lignes collées)"
+    : FROM.length > 120 ? `elle fait ${FROM.length} caractères (une adresse en fait 20 à 60 : autre chose a été collé)`
+    : !/^[^\s@<>]+@[^\s@<>]+\.[a-z]{2,}$/i.test(adresse) ? "elle ne ressemble pas à une adresse email"
+    : nomAffiche.length > 60 ? "le nom affiché avant < > est trop long" : "";
+  if (probleme) {
+    erreur(`Le secret EMAIL_FROM n'est pas valide : ${probleme}. Format attendu : DIDI Jobs Connect <contact@votredomaine.com> ou contact@votredomaine.com`);
+    if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## Aucun email envoyé\n\n**Le secret EMAIL_FROM n'est pas valide** : ${probleme}.\n\nFormat attendu : \`DIDI Jobs Connect <contact@votredomaine.com>\` ou \`contact@votredomaine.com\`. Modifiez le secret (icône crayon) puis relancez.\n`);
+    process.exit(1);
+  }
+}
 const sb = createClient(SUPABASE_URL, CLE, { auth: { persistSession: false } });
 const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
@@ -35,7 +49,7 @@ for (let debut = 0; ; debut += 1000) {
 const { data: deja, error: e2 } = await sb.from("notes").select("candidat_id").eq("texte", MARQUE);
 if (e2) { erreur(`Lecture impossible : ${e2.message}`); process.exit(1); }
 const dejaRelances = new Set(deja.map((n) => n.candidat_id));
-const aRelancer = cibles.filter((c) => !dejaRelances.has(c.id) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email));
+const aRelancer = cibles.filter((c) => !dejaRelances.has(c.id) && c.email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email.trim()));
 const lot = aRelancer.slice(0, MAXIMUM);
 
 function email(c) {
@@ -60,7 +74,7 @@ Vous ne souhaitez plus figurer dans la CVthèque ? Répondez simplement « retra
 <p>Utilisez la même adresse email ou le même numéro que sur le site : votre fiche sera simplement complétée.</p>
 <p>L'équipe DIDI Jobs Connect</p>
 <p style="font-size:12px;color:#5a6280;margin-top:28px">Vous ne souhaitez plus figurer dans la CVthèque ? Répondez simplement « retrait » à cet email.</p></div>`;
-  return { from: FROM, to: [c.email], subject: `${prenom ? prenom + ", il" : "Il"} manque votre CV pour vous proposer aux recruteurs`, text: texte, html };
+  return { from: FROM, to: [c.email.trim()], subject: `${prenom ? prenom + ", il" : "Il"} manque votre CV pour vous proposer aux recruteurs`, text: texte, html };
 }
 
 let envoyes = 0, echecs = 0, raison = "";
