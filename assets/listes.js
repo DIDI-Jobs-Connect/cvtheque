@@ -24,6 +24,8 @@ export const DOMAINES = [
 export const couleurDomaine = (d) => (DOMAINES.find(([n]) => n === d) || DOMAINES[DOMAINES.length - 1])[1];
 
 export const CONTRATS = ["CDI", "CDD", "Stage", "Alternance / apprentissage", "Freelance / mission", "Temps partiel", "Bénévolat"];
+// Villes reconnues dans les offres collées et dans les CV lus automatiquement.
+export const VILLES = ["Cotonou", "Porto-Novo", "Abomey-Calavi", "Calavi", "Godomey", "Parakou", "Bohicon", "Abomey", "Ouidah", "Lokossa", "Natitingou", "Djougou", "Kandi", "Malanville", "Allada", "Sèmè-Podji", "Pobè", "Kétou", "Savalou", "Dassa-Zoumè", "Grand-Popo", "Comè", "Aplahoué", "Nikki", "Lomé", "Abidjan", "Dakar", "Ouagadougou", "Niamey", "Lagos"];
 export const NIVEAUX = ["Sans diplôme", "CEP", "BEPC", "CAP / BT", "BAC", "BTS / DUT (Bac+2)", "Licence (Bac+3)", "Master (Bac+5)", "Doctorat"];
 export const DISPONIBILITES = ["Immédiate", "Sous 2 semaines", "Sous 1 mois", "Plus tard (en poste)"];
 export const STATUTS = [

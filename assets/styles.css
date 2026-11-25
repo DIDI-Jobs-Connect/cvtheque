@@ -257,7 +257,7 @@ fieldset { border: 0; margin: 0; min-width: 0; }
 /* Fenêtres */
 dialog { width: min(720px, calc(100% - 2rem)); max-height: calc(100% - 2rem); padding: 0; border: 0; border-radius: var(--rayon); background: var(--papier); color: var(--encre); }
 dialog::backdrop { background: rgba(11, 16, 38, 0.45); }
-dialog form { display: grid; gap: 1rem; padding: 1.5rem; }
+dialog form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; padding: 1.5rem; }
 dialog h2 { font-size: 1.4rem; font-weight: 800; }
 dialog .envoi { margin-top: 0.25rem; justify-content: flex-end; }
 
@@ -820,3 +820,15 @@ dialog.large { width: min(860px, calc(100% - 2rem)); }
 .mon-profil .outils { margin-left: 0; }
 @media (prefers-reduced-motion: reduce) { .offres-compatibles { animation: none; } }
 .offre-tete > .offre-domaine { min-width: 0; }
+
+/* Lecture automatique des CV reçus */
+.resume-import { margin: 0.4rem 0; display: grid; gap: 0.2rem; }
+.resume-import:empty { display: none; }
+.manque-resume { color: var(--tampon); font-weight: 700; font-size: 0.88rem; }
+.ok-lecture { color: var(--ok); font-weight: 700; font-size: 0.88rem; }
+.tete-cv { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.4rem 0.8rem; }
+.raisons-cv, .infos-lues { margin: 0.25rem 0 0.4rem; font-size: 0.85rem; }
+.raisons-cv:empty, .infos-lues:empty { display: none; }
+.ligne-cv input.manque { border-color: color-mix(in srgb, var(--tampon) 55%, var(--trait)); background: color-mix(in srgb, var(--tampon) 5%, var(--papier)); }
+.jauge-compat.moyen { background: color-mix(in srgb, var(--ambre) 18%, var(--papier)); color: #8a5a12; }
+.jauge-compat.faible { background: color-mix(in srgb, var(--tampon) 10%, var(--papier)); color: var(--tampon); }

@@ -1,10 +1,11 @@
 import { CONFIG } from "./config.js?v=11";
 import { sb, configuree, esc, sansAccents, envoyerCv, verifierCv } from "./client.js?v=8";
 import { normal, motsCles, scorer } from "./compatibilite.js?v=1";
+import { lireTexteCv, analyserCv, scoreCv, etapeConseillee } from "./lecture-cv.js?v=1";
 import {
-  DOMAINES, CONTRATS, NIVEAUX, DISPONIBILITES, STATUTS, ETAPES, STATUTS_DEMANDE, TYPES_ACTIVITE, STATUTS_ENTREPRISE,
+  DOMAINES, CONTRATS, NIVEAUX, DISPONIBILITES, STATUTS, ETAPES, VILLES, STATUTS_DEMANDE, TYPES_ACTIVITE, STATUTS_ENTREPRISE,
   couleurDomaine, libelleStatut, libelleEtape,
-} from "./listes.js?v=8";
+} from "./listes.js?v=9";
 
 const $ = (s) => document.querySelector(s);
 const PAR_PAGE = 40;
@@ -763,59 +764,68 @@ function nomDepuisFichier(nomFichier) {
 function ouvrirImportCv() {
   const d = etat.posteOuvert.d;
   let fichiers = [];
+  const lus = new Map(); // index → { texte, infos, score, raisons, erreur }
+  const ETAPES_IMPORT = [["presente", "Présenter au client"], ["source", "Garder sous la main (Sourcé)"], ["refuse", "Non retenu pour ce poste"]];
   fenetre(`
     <h2>Ajouter des CV reçus</h2>
-    <p class="aide">Pour le poste <b>${esc(d.titre)}</b>. Choisissez les CV reçus par email ou WhatsApp (PDF ou Word, 5 Mo maximum chacun), vérifiez les noms, puis ajoutez-les. Une personne déjà dans la CVthèque (même email ou même téléphone) n'est pas créée en double.</p>
+    <p class="aide">Pour le poste <b>${esc(d.titre)}</b>. Choisissez les CV reçus par email ou WhatsApp (PDF ou Word, 5 Mo maximum chacun). Chaque CV est lu automatiquement : les informations du candidat se remplissent, celles qui manquent sont signalées, et la compatibilité avec le poste propose une étape. Une personne déjà dans la CVthèque (même email ou même téléphone) n'est pas créée en double.</p>
     <label class="fichier"><b>CV reçus</b><span class="aide">Vous pouvez en sélectionner plusieurs d'un coup.</span>
       <input type="file" id="cv-multiples" multiple accept=".pdf,.doc,.docx"></label>
+    <div id="resume-import" class="resume-import" aria-live="polite"></div>
     <div id="lignes-cv" class="lignes-cv"></div>
-    <label class="champ"><span>Étape dans le pipeline</span><select name="etape">
-      <option value="presente" selected>Présenté au client (le recruteur les voit tout de suite)</option>
-      <option value="source">Sourcé (je les trie d'abord)</option>
-    </select></label>
     <label class="accord" style="margin-top:0"><input type="checkbox" name="consentement" required><span>Ces personnes ont envoyé leur CV pour cette offre : elles acceptent qu'il soit conservé et transmis au recruteur.</span></label>`,
   async (f) => {
     if (!fichiers.length) return "Choisissez au moins un CV.";
     if (f.get("consentement") !== "on") return "Cochez la case d'accord des candidats avant d'ajouter les CV.";
-    const etape = val(f, "etape") || "presente";
+    const nombre = (v) => (v === null || Number.isNaN(Number(v)) ? null : Math.max(0, Math.min(60, Math.round(Number(v)))));
     const lignes = fichiers.map((fichier, i) => ({
       fichier, prenom: val(f, `prenom-${i}`), nom: val(f, `nom-${i}`),
       telephone: val(f, `telephone-${i}`), email: val(f, `email-${i}`)?.toLowerCase() ?? null,
+      ville: val(f, `ville-${i}`), experience: nombre(val(f, `experience-${i}`)), etape: val(f, `etape-${i}`) || "source",
+      lu: lus.get(i)?.infos || {}, domaine: lus.get(i)?.domaine || null,
     }));
     const incomplete = lignes.findIndex((l) => !l.prenom || !l.nom);
     if (incomplete >= 0) return `Indiquez le prénom et le nom pour « ${lignes[incomplete].fichier.name} ».`;
     const maintenant = new Date().toISOString();
     const echecs = [];
     let ajoutes = 0, existants = 0;
+    const COLONNES = "id, cv_chemin, cv_nom, anciens_cv, telephone, email, ville, experience, niveau, competences, langues";
     for (const l of lignes) {
       try {
         const chemin = await envoyerCv(l.fichier, "equipe");
         const telChiffres = l.telephone ? l.telephone.replace(/\D/g, "").replace(/^(00)?229/, "") || null : null;
+        const complements = { telephone: l.telephone, email: l.email, ville: l.ville, experience: l.experience, niveau: l.lu.niveau || null, competences: l.lu.competences || null, langues: l.lu.langues || null };
         let existant = null;
-        if (l.email) existant = (await sb.from("candidats").select("id, cv_chemin, cv_nom, anciens_cv").eq("email", l.email).limit(1)).data?.[0] || null;
-        if (!existant && telChiffres) existant = (await sb.from("candidats").select("id, cv_chemin, cv_nom, anciens_cv").eq("telephone_chiffres", telChiffres).limit(1)).data?.[0] || null;
+        if (l.email) existant = (await sb.from("candidats").select(COLONNES).eq("email", l.email).limit(1)).data?.[0] || null;
+        if (!existant && telChiffres) existant = (await sb.from("candidats").select(COLONNES).eq("telephone_chiffres", telChiffres).limit(1)).data?.[0] || null;
         let id;
         if (existant) {
           const maj = { cv_chemin: chemin, cv_nom: l.fichier.name.slice(0, 200), modifie_le: maintenant };
           if (existant.cv_chemin) maj.anciens_cv = [...(existant.anciens_cv || []), { chemin: existant.cv_chemin, nom: existant.cv_nom, remplace_le: maintenant }];
+          // On complète seulement ce qui manquait sur la fiche existante.
+          for (const [k, v] of Object.entries(complements)) if (v != null && existant[k] == null) maj[k] = v;
+          if (maj.telephone) maj.telephone_chiffres = telChiffres;
           const { error } = await sb.from("candidats").update(maj).eq("id", existant.id);
           if (error) throw error;
           id = existant.id;
           existants++;
         } else {
           const { data, error } = await sb.from("candidats").insert({
-            prenom: l.prenom, nom: l.nom, telephone: l.telephone, telephone_chiffres: telChiffres, email: l.email,
-            domaine: d.domaine || "Autre domaine", postes: d.titre, contrats: d.contrat ? [d.contrat] : [],
+            prenom: l.prenom, nom: l.nom, ...complements, telephone_chiffres: telChiffres,
+            domaine: l.domaine || d.domaine || "Autre domaine", // Un CV d'un autre métier garde son propre intitulé, pour ressortir sur les bons postes plus tard.
+            postes: l.domaine && d.domaine && l.domaine !== d.domaine && l.lu.titre ? l.lu.titre.slice(0, 200)
+              : l.lu.titre && !normal(l.lu.titre).includes(normal(d.titre)) ? `${d.titre}, ${l.lu.titre}`.slice(0, 200) : d.titre,
+            contrats: d.contrat ? [d.contrat] : [],
             cv_chemin: chemin, cv_nom: l.fichier.name.slice(0, 200), source: "email", consentement_le: maintenant,
           }).select("id").single();
           if (error) throw error;
           id = data.id;
         }
-        const { error: e1 } = await sb.from("demande_candidats").upsert({ demande_id: d.id, candidat_id: id, etape, origine: "candidature" }, { onConflict: "demande_id,candidat_id", ignoreDuplicates: true });
+        const { error: e1 } = await sb.from("demande_candidats").upsert({ demande_id: d.id, candidat_id: id, etape: l.etape, origine: "candidature" }, { onConflict: "demande_id,candidat_id", ignoreDuplicates: true });
         if (e1) throw e1;
-        if (etape !== "source") {
-          await sb.from("demande_candidats").update({ etape, modifie_le: maintenant }).eq("demande_id", d.id).eq("candidat_id", id).in("etape", ["source", "contacte"]);
-          if (STATUT_PAR_ETAPE[etape]) await sb.from("candidats").update({ statut: STATUT_PAR_ETAPE[etape], modifie_le: maintenant }).eq("id", id);
+        if (l.etape !== "source") {
+          await sb.from("demande_candidats").update({ etape: l.etape, modifie_le: maintenant }).eq("demande_id", d.id).eq("candidat_id", id).in("etape", ["source", "contacte"]);
+          if (STATUT_PAR_ETAPE[l.etape]) await sb.from("candidats").update({ statut: STATUT_PAR_ETAPE[l.etape], modifie_le: maintenant }).eq("id", id);
         }
         ajoutes++;
       } catch (err) {
@@ -823,31 +833,103 @@ function ouvrirImportCv() {
         echecs.push(`${l.fichier.name} : ${/CV|fichier|Mo/.test(err?.message || "") ? err.message : "enregistrement impossible"}`);
       }
     }
-    if (d.jeton_recruteur && etape !== "source") await preparerPartage(d.id).catch(console.error);
+    if (d.jeton_recruteur && lignes.some((l) => l.etape === "presente")) await preparerPartage(d.id).catch(console.error);
     await chargerDemandes();
     if (etat.vue === "postes") await ouvrirPoste(d.id);
+    const presentes = lignes.filter((l) => l.etape === "presente").length;
     if (echecs.length) {
       // On ferme quand même : les CV déjà enregistrés ne doivent pas être envoyés deux fois.
       setTimeout(() => alert(`${ajoutes} ${pluriel(ajoutes, "CV ajouté", "CV ajoutés")}.\n\nNon ajoutés, à reprendre un par un :\n${echecs.join("\n")}`), 50);
       return;
     }
-    flash(`${ajoutes} ${pluriel(ajoutes, "CV ajouté", "CV ajoutés")} au poste${existants ? ` (dont ${existants} déjà ${pluriel(existants, "connu", "connus")} dans la CVthèque)` : ""}.`);
+    flash(`${ajoutes} ${pluriel(ajoutes, "CV ajouté", "CV ajoutés")} au poste, dont ${presentes} ${pluriel(presentes, "présenté", "présentés")} au client${existants ? ` (${existants} déjà ${pluriel(existants, "connu", "connus")} dans la CVthèque)` : ""}.`);
   }, "Ajouter les CV");
 
   const zone = $("#lignes-cv");
-  $("#cv-multiples").addEventListener("change", (e) => {
+  const resume = $("#resume-import");
+  const champ = (i, k, libelle, type = "text", attrs = "") =>
+    `<label class="champ"><span>${libelle}</span><input type="${type}" name="${k}-${i}" ${attrs}></label>`;
+
+  function majResume() {
+    const finis = [...lus.values()];
+    if (!fichiers.length) { resume.innerHTML = ""; return; }
+    if (finis.length < fichiers.length) { resume.innerHTML = `<p class="aide">Lecture des CV : ${finis.length} sur ${fichiers.length}…</p>`; return; }
+    const compte = (e) => fichiers.filter((_, i) => $(`[name="etape-${i}"]`)?.value === e).length;
+    const manque = (champ) => fichiers.filter((_, i) => !$(`[name="${champ}-${i}"]`)?.value.trim()).length;
+    const illisibles = finis.filter((x) => x.erreur).length;
+    const alertes = [["telephone", "sans téléphone"], ["email", "sans email"], ["ville", "sans ville"]].map(([k, l]) => [manque(k), l]).filter(([n]) => n).map(([n, l]) => `${n} ${l}`);
+    resume.innerHTML = `<p><b>${fichiers.length} ${pluriel(fichiers.length, "CV lu", "CV lus")}, du plus au moins compatible.</b>
+      ${compte("presente")} à présenter, ${compte("source")} à garder sous la main, ${compte("refuse")} non ${pluriel(compte("refuse"), "retenu", "retenus")}.</p>
+      ${alertes.length ? `<p class="manque-resume">À compléter : ${alertes.join(", ")}.</p>` : `<p class="aide">Toutes les coordonnées ont été trouvées.</p>`}
+      ${illisibles ? `<p class="manque-resume">${illisibles} ${pluriel(illisibles, "CV n'a pas pu être lu", "CV n'ont pas pu être lus")} : remplissez à la main.</p>` : ""}`;
+  }
+
+  function signalerManques(i) {
+    const ligne = $(`#ligne-cv-${i}`);
+    const manquants = [["prenom", "prénom"], ["nom", "nom"], ["telephone", "téléphone"], ["email", "email"], ["ville", "ville"], ["experience", "expérience"]]
+      .filter(([k]) => { const el = ligne.querySelector(`[name="${k}-${i}"]`); el.classList.toggle("manque", !el.value.trim()); return !el.value.trim(); })
+      .map(([, l]) => l);
+    const lu = lus.get(i);
+    ligne.querySelector(".etat-lecture").innerHTML = lu?.erreur
+      ? `<span class="manque-resume">${esc(lu.erreur)}</span>`
+      : manquants.length ? `<span class="manque-resume">À compléter : ${manquants.join(", ")}</span>` : `<span class="ok-lecture">Informations complètes</span>`;
+  }
+
+  async function lire(fichier, i) {
+    const { texte, erreur } = await lireTexteCv(fichier);
+    const infos = texte ? analyserCv(texte) : { manquants: [] };
+    const { score, raisons } = texte ? scoreCv(texte, infos, d) : { score: null, raisons: [] };
+    lus.set(i, { infos, score, raisons, erreur, domaine: texte ? devinerDomaine(texte) : null });
+    const ligne = $(`#ligne-cv-${i}`);
+    if (!ligne) return;
+    const remplir = (k, v) => { const el = ligne.querySelector(`[name="${k}-${i}"]`); if (v != null && v !== "" && (!el.value.trim() || el.dataset.auto)) { el.value = v; delete el.dataset.auto; } };
+    remplir("prenom", infos.prenom); remplir("nom", infos.nom); remplir("telephone", infos.telephone);
+    remplir("email", infos.email); remplir("ville", infos.ville); remplir("experience", infos.experience);
+    const plus = [infos.titre, infos.niveau, infos.experienceEstimee && infos.experience != null ? `expérience estimée d'après les dates` : "", infos.competences].filter(Boolean);
+    ligne.querySelector(".infos-lues").textContent = plus.join(" · ");
+    if (erreur) ligne.querySelector(".score-cv").innerHTML = `<span class="jauge-compat faible">Non lu</span>`;
+    if (score != null) {
+      ligne.dataset.score = score;
+      ligne.querySelector(".score-cv").innerHTML = `<span class="jauge-compat ${score >= 65 ? "" : score >= 40 ? "moyen" : "faible"}"><b>${score} %</b> compatible</span>`;
+      ligne.querySelector(".raisons-cv").textContent = raisons.join(" · ");
+      const select = ligne.querySelector(`[name="etape-${i}"]`);
+      if (!select.dataset.touche) select.value = etapeConseillee(score);
+    }
+    signalerManques(i);
+  }
+
+  zone.addEventListener("input", (e) => { delete e.target.dataset.auto; const i = e.target.name?.split("-").pop(); if (i && lus.has(Number(i))) { signalerManques(Number(i)); majResume(); } });
+  zone.addEventListener("change", (e) => { if (e.target.name?.startsWith("etape-")) { e.target.dataset.touche = "1"; majResume(); } });
+
+  $("#cv-multiples").addEventListener("change", async (e) => {
     const refuses = [];
     fichiers = [...e.target.files].filter((x) => { const v = verifierCv(x); if (v.erreur) refuses.push(`${x.name} : ${v.erreur}`); return !v.erreur; });
+    lus.clear();
     zone.innerHTML = (refuses.length ? `<p class="erreur">${refuses.map(esc).join("<br>")}</p>` : "") + fichiers.map((x, i) => {
       const n = nomDepuisFichier(x.name);
-      return `<fieldset class="ligne-cv"><legend>${esc(x.name)}</legend>
+      return `<fieldset class="ligne-cv" id="ligne-cv-${i}"><legend>${esc(x.name)}</legend>
+        <div class="tete-cv"><span class="score-cv"><span class="aide">Lecture du CV…</span></span><span class="etat-lecture"></span></div>
+        <p class="raisons-cv aide"></p>
         <div class="grille deux">
-          <label class="champ"><span>Prénom</span><input type="text" name="prenom-${i}" required value="${esc(n.prenom)}"></label>
-          <label class="champ"><span>Nom</span><input type="text" name="nom-${i}" required value="${esc(n.nom)}"></label>
-          <label class="champ"><span>Téléphone <small>(facultatif)</small></span><input type="tel" name="telephone-${i}"></label>
-          <label class="champ"><span>Email <small>(facultatif)</small></span><input type="email" name="email-${i}"></label>
-        </div></fieldset>`;
+          ${champ(i, "prenom", "Prénom", "text", `required data-auto="1" value="${esc(n.prenom)}"`)}
+          ${champ(i, "nom", "Nom", "text", `required data-auto="1" value="${esc(n.nom)}"`)}
+          ${champ(i, "telephone", "Téléphone", "tel")}
+          ${champ(i, "email", "Email", "email")}
+          ${champ(i, "ville", "Ville")}
+          ${champ(i, "experience", "Expérience (années)", "number", `min="0" max="60"`)}
+        </div>
+        <p class="infos-lues aide"></p>
+        <label class="champ"><span>Étape pour ce poste</span><select name="etape-${i}">${ETAPES_IMPORT.map(([k, l]) => `<option value="${k}"${k === "source" ? " selected" : ""}>${l}</option>`).join("")}</select></label>
+      </fieldset>`;
     }).join("");
+    majResume();
+    // Deux lectures à la fois : rapide sans bloquer un vieux téléphone.
+    const file = fichiers.map((x, i) => [x, i]);
+    const ouvrier = async () => { while (file.length) { const [x, i] = file.shift(); await lire(x, i); majResume(); } };
+    await Promise.all([ouvrier(), ouvrier()]);
+    // Du plus compatible au moins compatible (les champs déjà saisis sont conservés).
+    [...zone.querySelectorAll(".ligne-cv")].sort((a, b) => (Number(b.dataset.score) || -1) - (Number(a.dataset.score) || -1)).forEach((el) => zone.append(el));
+    majResume();
   });
 }
 
@@ -1178,7 +1260,17 @@ async function copierMessage() {
 }
 
 // ---------- Offre collée : analyse automatique ----------
-const VILLES = ["Cotonou", "Porto-Novo", "Abomey-Calavi", "Calavi", "Godomey", "Parakou", "Bohicon", "Abomey", "Ouidah", "Lokossa", "Natitingou", "Djougou", "Kandi", "Malanville", "Allada", "Sèmè-Podji", "Pobè", "Kétou", "Savalou", "Dassa-Zoumè", "Grand-Popo", "Comè", "Aplahoué", "Nikki", "Lomé", "Abidjan", "Dakar", "Ouagadougou", "Niamey", "Lagos"];
+/** Domaine le plus probable d'un texte (CV) d'après les mots du métier ; null si trop incertain. */
+function devinerDomaine(texte) {
+  const plat = normal(texte);
+  let domaine = null, meilleur = 0;
+  for (const [dom, mots] of Object.entries(MOTS_DOMAINES)) {
+    const score = mots.reduce((n, m) => n + (plat.match(new RegExp(m, "g")) || []).length, 0);
+    if (score > meilleur) { meilleur = score; domaine = dom; }
+  }
+  return meilleur >= 2 ? domaine : null;
+}
+
 const MOTS_DOMAINES = {
   "Administration & secrétariat": ["secretaire", "assistante? de direction", "assistante? administrati", "administratif", "receptionniste", "standardiste", "hotesse d'accueil", "agent d'accueil"],
   "Comptabilité & finance": ["comptab", "financ", "auditeur", "audit", "tresori", "fiscal", "controleur de gestion"],
