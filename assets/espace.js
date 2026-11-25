@@ -1376,6 +1376,8 @@ function analyserOffre(texte) {
     || capture(/recrut(?:e|ent|ons)\s+(?:(?:rapidement|activement|urgemment|actuellement|aujourd['’]hui)\s+)?(?:(?:un\(e\)|une|un|des|son|sa|ses|leur|d['’]une|d['’]un)(?![\p{L}]))?\s*\(?\d*\)?\s*([^\n,.]{3,80}?)(?:\s+(?:pour|à|au|en)(?=\s|$)|\s*\(?H\/F\)?|[,.\n]|$)/iu);
   if (!titre) titre = lignes.find((l) => l.length <= 90 && !/^(offre|avis|appel)\b.*(emploi|recrutement|candidature)/i.test(normal(l)) && !/^(urgent|recrutement)$/i.test(l)) || lignes[0] || "";
   titre = titre.replace(/\s*\(?\s*[HF]\s*\/\s*[HF]\s*\)?\s*$/i, "").replace(/^(un|une|des)\s+/i, "").trim();
+  // Intitulé tout en majuscules (« MANAGER COMMERCIAL(E) ») : on le remet en minuscules lisibles.
+  if (titre.length > 3 && titre === titre.toUpperCase()) titre = titre.toLowerCase();
   titre = titre.charAt(0).toUpperCase() + titre.slice(1);
 
   const ville = VILLES.find((v) => new RegExp(`\\b${normal(v).replace("-", "[- ]")}\\b`).test(plat)) || null;
