@@ -768,7 +768,7 @@ function ouvrirImportCv() {
   const ETAPES_IMPORT = [["presente", "Présenter au client"], ["source", "Garder sous la main (Sourcé)"], ["refuse", "Non retenu pour ce poste"]];
   fenetre(`
     <h2>Ajouter des CV reçus</h2>
-    <p class="aide">Pour le poste <b>${esc(d.titre)}</b>. Choisissez les CV reçus par email ou WhatsApp (PDF ou Word, 5 Mo maximum chacun). Chaque CV est lu automatiquement : les informations du candidat se remplissent, celles qui manquent sont signalées, et la compatibilité avec le poste propose une étape. Une personne déjà dans la CVthèque (même email ou même téléphone) n'est pas créée en double.</p>
+    <p class="aide">Pour le poste <b>${esc(d.titre)}</b>. Choisissez les CV reçus par email ou WhatsApp (PDF ou Word, 5 Mo maximum chacun). Chaque CV est lu automatiquement : les informations du candidat se remplissent, celles qui manquent sont signalées, et la compatibilité avec le poste donne un conseil. Tous les CV arrivent en « Sourcé » : rien n'est montré au client avant que vous ne passiez un candidat à « Présenté ». Une personne déjà dans la CVthèque (même email ou même téléphone) n'est pas créée en double.</p>
     <label class="fichier"><b>CV reçus</b><span class="aide">Vous pouvez en sélectionner plusieurs d'un coup.</span>
       <input type="file" id="cv-multiples" multiple accept=".pdf,.doc,.docx"></label>
     <div id="resume-import" class="resume-import" aria-live="polite"></div>
@@ -842,7 +842,7 @@ function ouvrirImportCv() {
       setTimeout(() => alert(`${ajoutes} ${pluriel(ajoutes, "CV ajouté", "CV ajoutés")}.\n\nNon ajoutés, à reprendre un par un :\n${echecs.join("\n")}`), 50);
       return;
     }
-    flash(`${ajoutes} ${pluriel(ajoutes, "CV ajouté", "CV ajoutés")} au poste, dont ${presentes} ${pluriel(presentes, "présenté", "présentés")} au client${existants ? ` (${existants} déjà ${pluriel(existants, "connu", "connus")} dans la CVthèque)` : ""}.`);
+    flash(`${ajoutes} ${pluriel(ajoutes, "CV ajouté", "CV ajoutés")} au poste, ${presentes ? `dont ${presentes} ${pluriel(presentes, "présenté", "présentés")} au client` : "en « Sourcé » : triez-les puis passez les bons à « Présenté »"}${existants ? ` (${existants} déjà ${pluriel(existants, "connu", "connus")} dans la CVthèque)` : ""}.`);
   }, "Ajouter les CV");
 
   const zone = $("#lignes-cv");
@@ -855,11 +855,12 @@ function ouvrirImportCv() {
     if (!fichiers.length) { resume.innerHTML = ""; return; }
     if (finis.length < fichiers.length) { resume.innerHTML = `<p class="aide">Lecture des CV : ${finis.length} sur ${fichiers.length}…</p>`; return; }
     const compte = (e) => fichiers.filter((_, i) => $(`[name="etape-${i}"]`)?.value === e).length;
+    const conseils = (e) => [...zone.querySelectorAll(".ligne-cv")].filter((l) => l.dataset.conseil === e).length;
     const manque = (champ) => fichiers.filter((_, i) => !$(`[name="${champ}-${i}"]`)?.value.trim()).length;
     const illisibles = finis.filter((x) => x.erreur).length;
     const alertes = [["telephone", "sans téléphone"], ["email", "sans email"], ["ville", "sans ville"]].map(([k, l]) => [manque(k), l]).filter(([n]) => n).map(([n, l]) => `${n} ${l}`);
     resume.innerHTML = `<p><b>${fichiers.length} ${pluriel(fichiers.length, "CV lu", "CV lus")}, du plus au moins compatible.</b>
-      ${compte("presente")} à présenter, ${compte("source")} à garder sous la main, ${compte("refuse")} non ${pluriel(compte("refuse"), "retenu", "retenus")}.</p>
+      Conseil : ${conseils("presente")} à présenter, ${conseils("source")} à garder, ${conseils("refuse")} plutôt à écarter. ${compte("presente") ? `<b>${compte("presente")} ${pluriel(compte("presente"), "sera présenté", "seront présentés")} au client.</b>` : "Tous arrivent en « Sourcé », pour que vous les triiez avant de présenter."}</p>
       ${alertes.length ? `<p class="manque-resume">À compléter : ${alertes.join(", ")}.</p>` : `<p class="aide">Toutes les coordonnées ont été trouvées.</p>`}
       ${illisibles ? `<p class="manque-resume">${illisibles} ${pluriel(illisibles, "CV n'a pas pu être lu", "CV n'ont pas pu être lus")} : remplissez à la main.</p>` : ""}`;
   }
@@ -893,7 +894,10 @@ function ouvrirImportCv() {
       ligne.querySelector(".score-cv").innerHTML = `<span class="jauge-compat ${score >= 65 ? "" : score >= 40 ? "moyen" : "faible"}"><b>${score} %</b> compatible</span>`;
       ligne.querySelector(".raisons-cv").textContent = raisons.join(" · ");
       const select = ligne.querySelector(`[name="etape-${i}"]`);
-      if (!select.dataset.touche) select.value = etapeConseillee(score);
+      // Tout arrive en « Sourcé » : l'équipe trie avant de présenter quoi que ce soit au client.
+      const conseil = { presente: "à présenter", source: "à garder sous la main", refuse: "plutôt à écarter" }[etapeConseillee(score)];
+      ligne.dataset.conseil = etapeConseillee(score);
+      ligne.querySelector(".score-cv").insertAdjacentHTML("beforeend", ` <span class="aide">Conseil : ${conseil}</span>`);
     }
     signalerManques(i);
   }
