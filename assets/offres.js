@@ -1,9 +1,14 @@
 import { sb, configuree, esc, sansAccents } from "./client.js?v=6";
 import { DOMAINES, couleurDomaine } from "./listes.js?v=6";
+import { scorer, SEUIL_CANDIDAT, profilMemorise, oublierProfil } from "./compatibilite.js?v=1";
 
 const $ = (s) => document.querySelector(s);
 const dateFr = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long" });
 let offres = [];
+// Profil gardé sur cet appareil après un dépôt de CV (domaine, poste, ville… jamais le CV).
+let profil = profilMemorise();
+let pourMoi = false;
+const compat = (o) => (profil ? scorer(profil, o).score : 0);
 
 function fraicheur(d) {
   const jours = Math.floor((Date.now() - new Date(d)) / 86400000);
@@ -18,6 +23,8 @@ function carte(o, i) {
         <span class="offre-domaine">${esc(o.domaine || "Tous domaines")}</span>
         <span class="offre-date">${fraicheur(o.publiee_le)}</span>
       </div>
+      ${profil?.postulees?.includes(o.id) ? `<span class="tampon place badge-offre">Vous avez postulé</span>`
+        : compat(o) >= SEUIL_CANDIDAT ? `<span class="jauge-compat badge-offre"><b>${compat(o)} %</b> compatible avec votre profil</span>` : ""}
       <h2>${esc(o.titre)}</h2>
       ${o.entreprise ? `<p class="offre-entreprise">${esc(o.entreprise)}</p>` : ""}
       <ul class="offre-infos">${infos.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
@@ -32,14 +39,32 @@ function carte(o, i) {
 function afficher() {
   const texte = sansAccents($("#recherche-offres").value.trim().toLowerCase());
   const domaine = $("#domaine-offres").value;
-  const liste = offres.filter((o) => (!domaine || o.domaine === domaine) &&
+  const liste = offres.filter((o) => (!pourMoi || compat(o) >= SEUIL_CANDIDAT) && (!domaine || o.domaine === domaine) &&
     (!texte || texte.split(/\s+/).every((m) => sansAccents(`${o.titre} ${o.ville} ${o.details} ${o.domaine} ${o.contrat}`.toLowerCase()).includes(m))));
   $("#compte-offres").textContent = offres.length ? `${liste.length} recrutement${liste.length > 1 ? "s" : ""} en cours` : "";
+  bandeauProfil();
   $("#liste-offres").innerHTML = liste.length
     ? liste.map(carte).join("")
     : `<div class="vide"><h2>${offres.length ? "Aucun recrutement ne correspond" : "Pas de recrutement en cours pour le moment"}</h2>
         <p>${offres.length ? "Essayez un autre mot ou un autre domaine." : "De nouveaux postes arrivent chaque semaine."} Déposez votre CV dans notre CVthèque : nous vous appelons dès qu'un poste vous correspond.</p>
         <p style="margin-top:1rem"><a class="bouton" href="./">Déposer mon CV</a></p></div>`;
+}
+
+// Bandeau pour la personne qui a déjà déposé son CV depuis cet appareil.
+function bandeauProfil() {
+  const zone = $("#mon-profil");
+  if (!zone) return;
+  const n = profil ? offres.filter((o) => compat(o) >= SEUIL_CANDIDAT).length : 0;
+  if (!profil || !offres.length) { zone.hidden = true; return; }
+  zone.hidden = false;
+  zone.innerHTML = `<p><b>${n ? `${n} offre${n > 1 ? "s" : ""} compatible${n > 1 ? "s" : ""} avec votre profil` : "Aucune offre compatible pour le moment"}</b>
+      <span class="aide">Selon le CV déposé depuis cet appareil : ${esc(profil.postes || profil.domaine || "")}${profil.ville ? `, ${esc(profil.ville)}` : ""}.</span></p>
+    <div class="outils">
+      ${n ? `<button type="button" class="bouton petit${pourMoi ? "" : " secondaire"}" id="bouton-pour-moi" aria-pressed="${pourMoi}">${pourMoi ? "Voir toutes les offres" : "Voir seulement celles-ci"}</button>` : ""}
+      <button type="button" class="bouton discret petit" id="oublier-profil">Ce n'est pas moi</button>
+    </div>`;
+  $("#bouton-pour-moi")?.addEventListener("click", () => { pourMoi = !pourMoi; afficher(); });
+  $("#oublier-profil").addEventListener("click", () => { oublierProfil(); profil = null; pourMoi = false; afficher(); });
 }
 
 async function demarrer() {

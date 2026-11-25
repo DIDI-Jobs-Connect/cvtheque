@@ -803,3 +803,20 @@ dialog.large { width: min(860px, calc(100% - 2rem)); }
 .lignes-cv { display: grid; gap: 0.7rem; margin: 0.6rem 0; }
 .ligne-cv { margin: 0; padding: 0.6rem 0.8rem 0.2rem; border: 1px solid var(--trait); border-radius: var(--rayon); min-width: 0; }
 .ligne-cv legend { padding: 0 0.3rem; font-weight: 700; font-size: 0.88rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Offres compatibles avec le profil du candidat */
+.offres-compatibles { margin-top: 1.4rem; text-align: left; animation: monte var(--normal) var(--courbe) 1300ms both; }
+.offres-compatibles > h2 { font-size: clamp(1.25rem, 4vw, 1.6rem); font-weight: 800; }
+.offres-compatibles > .aide { margin-top: 0.2rem; }
+.offres-proposees { display: grid; gap: 0.8rem; margin-top: 0.9rem; }
+.offres-proposees .offre h3 { margin-top: 0.35rem; font-size: 1.2rem; font-weight: 800; }
+.offre .raisons { margin-top: 0.55rem; font-size: 0.85rem; color: var(--encre-2); }
+.offre .offre-pied { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 0.8rem; }
+.jauge-compat { display: inline-flex; flex: none; white-space: nowrap; align-items: baseline; gap: 0.3rem; padding: 0.15rem 0.6rem; border-radius: 99px; background: color-mix(in srgb, var(--ok) 12%, var(--papier)); color: var(--ok); font-size: 0.82rem; font-weight: 700; }
+.jauge-compat b { font-family: var(--titre); font-size: 0.95rem; }
+.badge-offre { margin-top: 0.55rem; }
+.mon-profil { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem 1rem; margin: 0.8rem 0; padding: 0.8rem 1rem; border-radius: var(--rayon); background: color-mix(in srgb, var(--ok) 8%, var(--papier)); border: 1px solid color-mix(in srgb, var(--ok) 30%, var(--trait)); }
+.mon-profil p { display: grid; gap: 0.1rem; min-width: 0; }
+.mon-profil .outils { margin-left: 0; }
+@media (prefers-reduced-motion: reduce) { .offres-compatibles { animation: none; } }
+.offre-tete > .offre-domaine { min-width: 0; }

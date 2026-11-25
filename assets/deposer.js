@@ -1,6 +1,7 @@
 import { CONFIG } from "./config.js?v=11";
 import { sb, configuree, esc, verifierCv, envoyerCv } from "./client.js";
 import { DOMAINES, CONTRATS, NIVEAUX, DISPONIBILITES, couleurDomaine } from "./listes.js";
+import { offresCompatibles, memoriserProfil } from "./compatibilite.js?v=1";
 
 const $ = (s) => document.querySelector(s);
 const form = $("#depot");
@@ -232,6 +233,55 @@ function confirmer(d, resultat) {
   }
   bloc.focus();
   window.scrollTo({ top: 0 });
+  proposerOffres(d).catch(console.error);
+}
+
+// Après le dépôt : les offres publiées qui correspondent au profil, avec candidature en 1 clic.
+// Le dossier `d` (CV déjà envoyé) reste en mémoire le temps de la visite, jamais sur l'appareil.
+async function proposerOffres(d) {
+  const postulees = offre ? [offre.id] : [];
+  memoriserProfil(d, postulees);
+  const { data, error } = await sb.rpc("offres_publiques");
+  if (error) throw error;
+  const liste = offresCompatibles(d, data || [], postulees).slice(0, 5);
+  const zone = $("#offres-compatibles");
+  if (!liste.length) {
+    if ((data || []).length) {
+      zone.innerHTML = `<p class="aide">Aucune offre en ligne ne correspond encore à votre profil. <a href="offres.html">Voir tous nos recrutements</a></p>`;
+      zone.hidden = false;
+    }
+    return;
+  }
+  zone.innerHTML = `
+    <h2>${liste.length === 1 ? "Cette offre correspond à votre profil" : `Ces ${liste.length} offres correspondent à votre profil`}</h2>
+    <p class="aide">Votre CV est déjà envoyé : un clic suffit pour postuler.</p>
+    <div class="offres-proposees">${liste.map(({ o, score, raisons }, i) => `
+      <article class="offre" style="--c:${couleurDomaine(o.domaine)};--i:${i}">
+        <div class="offre-tete"><span class="offre-domaine">${esc(o.domaine || "Tous domaines")}</span><span class="jauge-compat" aria-label="Compatible à ${score} %"><b>${score} %</b> compatible</span></div>
+        <h3>${esc(o.titre)}</h3>
+        ${o.entreprise ? `<p class="offre-entreprise">${esc(o.entreprise)}</p>` : ""}
+        <ul class="offre-infos">${[o.ville, o.contrat].filter(Boolean).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
+        <p class="raisons">${esc(raisons.join(" · "))}</p>
+        <div class="offre-pied"><a class="bouton discret petit" href="offres.html">Voir l'offre</a>
+          <button type="button" class="bouton petit" data-postuler="${esc(o.id)}">Postuler en 1 clic</button></div>
+      </article>`).join("")}</div>`;
+  zone.hidden = false;
+  zone.querySelectorAll("[data-postuler]").forEach((b) => b.addEventListener("click", async () => {
+    const id = b.dataset.postuler;
+    b.disabled = true;
+    b.textContent = "Envoi…";
+    try {
+      const { error: e } = await sb.rpc("deposer_cv", { d: { ...d, offre_id: id, source: "offre-compatible" } });
+      if (e) throw e;
+      postulees.push(id);
+      memoriserProfil(d, postulees);
+      b.replaceWith(Object.assign(document.createElement("span"), { className: "tampon place", textContent: "Candidature envoyée" }));
+    } catch (err) {
+      console.error(err);
+      b.disabled = false;
+      b.textContent = "Réessayer";
+    }
+  }));
 }
 
 $("#partager").addEventListener("click", async () => {

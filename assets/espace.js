@@ -1,5 +1,6 @@
 import { CONFIG } from "./config.js?v=11";
 import { sb, configuree, esc, sansAccents, envoyerCv, verifierCv } from "./client.js?v=8";
+import { normal, motsCles, scorer } from "./compatibilite.js?v=1";
 import {
   DOMAINES, CONTRATS, NIVEAUX, DISPONIBILITES, STATUTS, ETAPES, STATUTS_DEMANDE, TYPES_ACTIVITE, STATUTS_ENTREPRISE,
   couleurDomaine, libelleStatut, libelleEtape,
@@ -273,7 +274,7 @@ function barres(objet, libeller = (k) => k, couleur = () => "var(--action)") {
   return `<ul class="barres">${lignes.map(([k, n]) => `<li><span>${esc(libeller(k))}</span><i style="--w:${(n / max) * 100}%;--c:${couleur(k)}"></i><b>${n}</b></li>`).join("")}</ul>`;
 }
 
-const SOURCES = { chaine: "Chaîne WhatsApp", accompagnement: "Accompagnement", formulaire: "Formulaire", statut: "Statut WhatsApp", linkedin: "LinkedIn", facebook: "Facebook", "ajout par l'équipe": "Ajout manuel", inconnue: "Inconnue", site: "Site DIDI Jobs Connect", offre: "Candidature à une offre", "relance-site": "Relance des inscrits", "relance-email": "Relance par email", "relance-whatsapp": "Relance WhatsApp", "chaine-relance": "Relance chaîne WhatsApp", email: "CV reçu par email" };
+const SOURCES = { chaine: "Chaîne WhatsApp", accompagnement: "Accompagnement", formulaire: "Formulaire", statut: "Statut WhatsApp", linkedin: "LinkedIn", facebook: "Facebook", "ajout par l'équipe": "Ajout manuel", inconnue: "Inconnue", site: "Site DIDI Jobs Connect", offre: "Candidature à une offre", "relance-site": "Relance des inscrits", "relance-email": "Relance par email", "relance-whatsapp": "Relance WhatsApp", "chaine-relance": "Relance chaîne WhatsApp", email: "CV reçu par email", "offre-compatible": "Candidature en 1 clic (offre compatible)" };
 
 function rendreAccueil() {
   const b = etat.bord;
@@ -1259,33 +1260,6 @@ function ouvrirImportOffre() {
 }
 
 // ---------- Matching automatique ----------
-const MOTS_VIDES = new Set(["pour", "avec", "dans", "des", "les", "une", "sur", "confirme", "confirmee", "junior", "senior"]);
-const normal = (t) => sansAccents(String(t || "").toLowerCase());
-const motsCles = (t) => [...new Set(normal(t).split(/[^a-z0-9+#]+/).filter((m) => m.length > 2 && !MOTS_VIDES.has(m)))];
-
-/** Score sur 100 : domaine 30, intitulé 30, ville 15, expérience 10, contrat 10, disponibilité 5. */
-function scorer(c, d) {
-  const raisons = [];
-  let score = 0;
-  if (d.domaine && c.domaine === d.domaine) { score += 30; raisons.push("même domaine"); }
-  const mots = motsCles(d.titre);
-  if (mots.length) {
-    const texte = normal(`${c.postes} ${c.competences || ""}`);
-    const trouves = mots.filter((m) => texte.includes(m.slice(0, Math.max(4, m.length - 2))));
-    if (trouves.length) { score += Math.round((30 * trouves.length) / mots.length); raisons.push(`poste : ${trouves.join(", ")}`); }
-  }
-  if (d.ville && c.ville && (normal(c.ville).includes(normal(d.ville)) || normal(d.ville).includes(normal(c.ville)))) { score += 15; raisons.push(c.ville); }
-  if (d.experience_min != null) {
-    if (c.experience != null && c.experience >= d.experience_min) { score += 10; raisons.push(`${c.experience} an(s) d'expérience`); }
-    else if (c.experience != null && c.experience >= d.experience_min - 1) score += 5;
-  } else if (c.experience != null) score += 5;
-  if (d.contrat) { if ((c.contrats || []).includes(d.contrat)) { score += 10; raisons.push(d.contrat); } }
-  else score += 5;
-  if (c.disponibilite === "Immédiate") { score += 5; raisons.push("dispo. immédiate"); }
-  else if (c.disponibilite === "Sous 2 semaines") score += 3;
-  return { score: Math.min(100, score), raisons };
-}
-
 /** Profils de la CVthèque classés pour un poste (hors candidats déjà dans `exclus`). */
 async function profilsCompatibles(d, exclus = new Set()) {
   const colonnes = "id,prenom,nom,postes,competences,domaine,ville,experience,contrats,disponibilite,note";
