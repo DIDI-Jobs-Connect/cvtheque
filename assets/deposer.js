@@ -119,7 +119,7 @@ async function chargerOffre() {
   const zoneOffre = $("#offre-choisie");
   if (!offre) {
     zoneOffre.hidden = false;
-    zoneOffre.innerHTML = `<p>Cette offre est pourvue ou n'est plus en ligne. Déposez quand même votre CV : nous vous proposerons les prochains postes qui vous correspondent. <a href="offres.html">Voir les autres offres</a></p>`;
+    zoneOffre.innerHTML = `<p>Cette offre est pourvue ou n'est plus en ligne. Déposez quand même votre CV : nous vous proposerons les prochains postes qui vous correspondent. <a href="offres.html">Voir nos autres recrutements</a></p>`;
     return;
   }
   zoneOffre.hidden = false;

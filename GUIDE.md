@@ -96,7 +96,7 @@ branche **main**, dossier **/ (root)** → **Save**. Après 1 à 2 minutes, l'ad
 | Formulaire de dépôt (à partager) | `https://didi-jobs-connect.github.io/cvtheque/` |
 | Même formulaire, depuis votre chaîne WhatsApp | `https://didi-jobs-connect.github.io/cvtheque/?source=chaine` |
 | Même formulaire, pour les personnes que vous accompagnez | `https://didi-jobs-connect.github.io/cvtheque/?source=accompagnement` |
-| Page des offres (à partager) | `https://didi-jobs-connect.github.io/cvtheque/offres.html` |
+| « Nos recrutements en cours » (à partager) | `https://didi-jobs-connect.github.io/cvtheque/offres.html` |
 | Page entreprises « Vous recrutez ? » | `https://didi-jobs-connect.github.io/cvtheque/recruter.html` |
 | Espace recruteur (comptes validés) | `https://didi-jobs-connect.github.io/cvtheque/espace-recruteur.html` |
 | Espace équipe (privé) | `https://didi-jobs-connect.github.io/cvtheque/espace.html` |
@@ -123,7 +123,7 @@ Le mot après `?source=` apparaît dans chaque fiche (« Provenance ») : vous s
   lien vers chaque CV (valable 7 jours), à coller dans WhatsApp ou un email.
 - **Une offre vous est transmise** (WhatsApp, email…) : **Postes** → **Coller une offre reçue**. L'outil
   remplit le poste (intitulé, domaine, ville, contrat, expérience, salaire, date limite), le publie sur la
-  page des offres et ajoute aussitôt les profils compatibles (score de 60 ou plus) de la CVthèque.
+  page « Nos recrutements » et ajoute aussitôt les profils compatibles (score de 60 ou plus) de la CVthèque.
   Les candidats qui postulent en ligne arrivent dans la colonne « Sourcé » avec l'étiquette
   « A postulé en ligne ». « Partager sur WhatsApp » prépare l'annonce avec le lien pour postuler.
 - **Une entreprise remplit la page « Vous recrutez ? »** : sa demande apparaît dans **Entreprises** →

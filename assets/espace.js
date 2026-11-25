@@ -760,7 +760,7 @@ function rendrePostes() {
       }).join("")
     : `<div class="vide petit"><h2>Aucun poste</h2><p>Quand une entreprise vous confie un recrutement, créez le poste pour suivre les candidats étape par étape.</p></div>`;
   $("#contenu").innerHTML = `
-    <div class="resume"><h1>Postes à pourvoir</h1><div class="outils"><a class="bouton discret petit" href="${BASE}offres.html" target="_blank" rel="noopener">Voir la page des offres</a><button type="button" class="bouton petit secondaire" data-action="importer-offre">Coller une offre reçue</button><button type="button" class="bouton petit" data-action="nouveau-poste">Nouveau poste</button></div></div>
+    <div class="resume"><h1>Postes à pourvoir</h1><div class="outils"><a class="bouton discret petit" href="${BASE}offres.html" target="_blank" rel="noopener">Voir « Nos recrutements »</a><button type="button" class="bouton petit secondaire" data-action="importer-offre">Coller une offre reçue</button><button type="button" class="bouton petit" data-action="nouveau-poste">Nouveau poste</button></div></div>
     <div class="demandes"><div class="liste-postes">${liste}</div><div id="detail-poste">${ouvert ? "" : `<div class="panneau"><p class="aide">Choisissez un poste pour voir son pipeline, ou créez-en un.</p></div>`}</div></div>`;
   if (ouvert) rendrePipeline();
 }
@@ -824,7 +824,7 @@ function rendrePipeline() {
     if (e.target.checked && !d.publiee_le) champs.publiee_le = new Date().toISOString();
     const { error } = await sb.from("demandes").update(champs).eq("id", d.id);
     if (error) return echec(error);
-    flash(e.target.checked ? "Offre publiée sur la page des offres." : "Offre retirée de la page des offres.");
+    flash(e.target.checked ? "Poste publié dans « Nos recrutements »." : "Poste retiré de « Nos recrutements ».");
     await ouvrirPoste(d.id);
   });
   $("#statut-poste").addEventListener("change", async (e) => {
@@ -846,7 +846,7 @@ function blocPartage(d, pipeline) {
   const candidatures = pipeline.filter((p) => p.origine === "candidature").length;
   return `<div class="partage">
     <div class="partage-ligne">
-      <label class="interrupteur"><input type="checkbox" id="publier-poste"${d.publique ? " checked" : ""}> Publiée sur la page des offres</label>
+      <label class="interrupteur"><input type="checkbox" id="publier-poste"${d.publique ? " checked" : ""}> Publié dans « Nos recrutements »</label>
       ${d.publique ? `<button type="button" class="bouton discret petit" data-action="copier-lien-offre">Copier le lien pour postuler</button>
         <a class="bouton discret petit" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(`📢 Offre : ${d.titre}${d.ville ? ` (${d.ville})` : ""}. Postulez avec votre CV ici : ${lienOffre(d)}`)}">Partager sur WhatsApp</a>` : ""}
       ${candidatures ? `<span class="aide">${candidatures} ${pluriel(candidatures, "candidature en ligne", "candidatures en ligne")}</span>` : ""}
@@ -951,7 +951,7 @@ function ouvrirFormulairePoste(d = null, entrepriseId = null) {
     <label class="champ"><span>Détails du besoin <small>(visibles par tous si l'offre est publiée : retirez le nom du client si besoin)</small></span><textarea name="details" placeholder="Missions, diplôme, horaires, avantages…">${v("details")}</textarea></label>
     ${brouillon && d.entreprise_nom && !d.entreprise_id ? `<p class="aide">Entreprise repérée dans le texte : <b>${esc(d.entreprise_nom)}</b>. Elle n'est pas encore dans vos entreprises.</p>` : `<p class="aide">Pas encore l'entreprise dans la liste ? Créez-la d'abord dans l'onglet Entreprises.</p>`}
     <div class="cases">
-      <label class="case"><input type="checkbox" name="publique"${d?.publique || brouillon ? " checked" : ""}> Publier sur la page des offres (les candidats postulent en ligne)</label>
+      <label class="case"><input type="checkbox" name="publique"${d?.publique || brouillon ? " checked" : ""}> Publier dans « Nos recrutements » (les candidats postulent en ligne)</label>
       <label class="case"><input type="checkbox" name="afficher_entreprise"${d?.afficher_entreprise ? " checked" : ""}> Afficher le nom de l'entreprise sur l'offre</label>
       ${edition ? "" : `<label class="case"><input type="checkbox" name="auto"${brouillon || !d ? " checked" : ""}> Ajouter tout de suite les profils compatibles de la CVthèque</label>`}
     </div>`,
@@ -1077,7 +1077,7 @@ function analyserOffre(texte) {
 function ouvrirImportOffre() {
   fenetre(`
     <h2>Coller une offre reçue</h2>
-    <p class="aide">Collez le texte de l'offre tel que vous l'avez reçu (WhatsApp, email, Facebook…). L'outil remplit le poste, le publie sur la page des offres si vous le souhaitez et y ajoute les profils compatibles de la CVthèque.</p>
+    <p class="aide">Collez le texte de l'offre tel que vous l'avez reçu (WhatsApp, email, Facebook…). L'outil remplit le poste, le publie dans « Nos recrutements » si vous le souhaitez et y ajoute les profils compatibles de la CVthèque.</p>
     <label class="champ import-offre"><span>Texte de l'offre</span><textarea name="texte" required placeholder="Ex. : La société X recrute un(e) comptable confirmé(e) à Cotonou. CDI. 3 ans d'expérience minimum…"></textarea></label>`,
   async (f) => {
     const texte = val(f, "texte");

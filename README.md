@@ -3,7 +3,7 @@
 CVthèque et CRM de recrutement : un formulaire public où les candidats déposent leur CV
 (`index.html`) et un espace privé pour l'équipe (`espace.html`) : tableau de bord et relances,
 pipeline Kanban par poste, entreprises clientes et contacts, journal des échanges, matching
-automatique des profils, recherche et filtres. Plus une page d'offres publiques (`offres.html`),
+automatique des profils, recherche et filtres. Plus une page « Nos recrutements en cours » (`offres.html`),
 une page pour les entreprises avec les tarifs (`recruter.html`) et un lien privé par offre pour les
 recruteurs (`recruteur.html`).
 

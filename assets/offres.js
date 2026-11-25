@@ -34,10 +34,10 @@ function afficher() {
   const domaine = $("#domaine-offres").value;
   const liste = offres.filter((o) => (!domaine || o.domaine === domaine) &&
     (!texte || texte.split(/\s+/).every((m) => sansAccents(`${o.titre} ${o.ville} ${o.details} ${o.domaine} ${o.contrat}`.toLowerCase()).includes(m))));
-  $("#compte-offres").textContent = offres.length ? `${liste.length} offre${liste.length > 1 ? "s" : ""}` : "";
+  $("#compte-offres").textContent = offres.length ? `${liste.length} recrutement${liste.length > 1 ? "s" : ""} en cours` : "";
   $("#liste-offres").innerHTML = liste.length
     ? liste.map(carte).join("")
-    : `<div class="vide"><h2>${offres.length ? "Aucune offre ne correspond" : "Pas d'offre ouverte pour le moment"}</h2>
+    : `<div class="vide"><h2>${offres.length ? "Aucun recrutement ne correspond" : "Pas de recrutement en cours pour le moment"}</h2>
         <p>${offres.length ? "Essayez un autre mot ou un autre domaine." : "De nouveaux postes arrivent chaque semaine."} Déposez votre CV dans notre CVthèque : nous vous appelons dès qu'un poste vous correspond.</p>
         <p style="margin-top:1rem"><a class="bouton" href="./">Déposer mon CV</a></p></div>`;
 }
@@ -47,7 +47,7 @@ async function demarrer() {
   const { data, error } = await sb.rpc("offres_publiques");
   if (error) {
     console.error(error);
-    $("#liste-offres").innerHTML = `<div class="vide"><h2>Les offres n'ont pas pu être chargées</h2><p>Vérifiez votre connexion puis rechargez la page.</p></div>`;
+    $("#liste-offres").innerHTML = `<div class="vide"><h2>Les recrutements n'ont pas pu être chargés</h2><p>Vérifiez votre connexion puis rechargez la page.</p></div>`;
     return;
   }
   offres = data || [];
