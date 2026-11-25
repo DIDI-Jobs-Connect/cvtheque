@@ -24,6 +24,20 @@ const infos = (p) => [p.ville, p.experience != null ? `${p.experience} an${p.exp
 // =====================================================================
 // Connexion, création de compte, mot de passe oublié
 // =====================================================================
+// Deux types de comptes : l'entreprise qui recrute pour elle-même, le cabinet ou recruteur partenaire.
+const TYPES_COMPTE = [["entreprise", "Une entreprise qui recrute", "pour ses propres postes"], ["cabinet", "Un cabinet ou recruteur partenaire", "qui recrute pour ses clients"]];
+const typeDemande = () => (/entreprise/.test(location.hash) ? "entreprise" : /partenaire|cabinet/.test(location.hash) ? "cabinet" : "");
+const libelleStructure = (t) => (t === "entreprise" ? "Nom de l'entreprise" : t === "cabinet" ? "Nom du cabinet" : "Entreprise ou cabinet");
+const choixType = (choisi) => `<fieldset class="choix-type"><legend>Vous êtes</legend>
+    ${TYPES_COMPTE.map(([k, l, d]) => `<label class="type-compte"><input type="radio" name="type_compte" value="${k}"${choisi === k ? " checked" : ""} required><span><b>${l}</b><small>${d}</small></span></label>`).join("")}
+  </fieldset>`;
+function brancherChoixType() {
+  zone.querySelectorAll('[name="type_compte"]').forEach((r) => r.addEventListener("change", () => {
+    const l = zone.querySelector("#libelle-structure");
+    if (l) l.textContent = libelleStructure(r.value);
+  }));
+}
+
 function ecranConnexion(mode = "connexion", message = "") {
   $("#onglets").hidden = true;
   $("#liens-publics").hidden = false;
@@ -32,9 +46,9 @@ function ecranConnexion(mode = "connexion", message = "") {
   const creation = mode === "creation";
   zone.innerHTML = `
     <section class="entete-recruteur">
-      <p class="aide">Espace recruteur ${esc(ORGA)}</p>
-      <h1>${creation ? "Créer votre compte recruteur" : "Accéder à votre espace recruteur"}</h1>
-      <p class="aide">Retrouvez les profils présélectionnés pour vos postes, parcourez notre CVthèque et demandez les CV qui vous intéressent. Chaque compte est validé par notre équipe.</p>
+      <p class="aide">Espace entreprises et recruteurs ${esc(ORGA)}</p>
+      <h1>${creation ? "Créer votre espace pro" : "Accéder à votre espace pro"}</h1>
+      <p class="aide">Pour les entreprises qui recrutent et les cabinets partenaires : retrouvez les profils présélectionnés pour vos postes, parcourez notre CVthèque et demandez les CV qui vous intéressent. Chaque compte est validé par notre équipe.</p>
     </section>
     <div class="acces-recruteur">
     <div class="etape connexion-recruteur">
@@ -44,9 +58,9 @@ function ecranConnexion(mode = "connexion", message = "") {
       </div>
       ${message ? `<p class="info-connexion">${message}</p>` : ""}
       <form id="form-acces" novalidate>
-        ${creation ? `<div class="grille deux">
+        ${creation ? `${choixType(typeDemande())}<div class="grille deux">
           <label class="champ"><span>Votre nom</span><input type="text" name="nom" required maxlength="120" autocomplete="name"></label>
-          <label class="champ"><span>Entreprise ou cabinet</span><input type="text" name="entreprise" required maxlength="160" autocomplete="organization"></label>
+          <label class="champ"><span id="libelle-structure">${libelleStructure(typeDemande())}</span><input type="text" name="entreprise" required maxlength="160" autocomplete="organization"></label>
           <label class="champ"><span>Fonction <small>(facultatif)</small></span><input type="text" name="fonction" maxlength="120" placeholder="Ex. : DRH, chargé(e) de recrutement"></label>
           <label class="champ"><span>Téléphone (WhatsApp)</span><input type="tel" name="telephone" required maxlength="40" autocomplete="tel"></label>
         </div>` : ""}
@@ -63,7 +77,7 @@ function ecranConnexion(mode = "connexion", message = "") {
       <h2 id="titre-apercu">${creation ? "Comment ça marche" : "Pas encore de compte ?"}</h2>
       <ol class="etapes-recrutement compact">
         <li><b>Vous créez votre compte</b><span>Nom, entreprise, téléphone et email : 2&nbsp;minutes.</span></li>
-        <li><b>Notre équipe le valide</b><span>Nous vérifions chaque compte recruteur avant de l'ouvrir.</span></li>
+        <li><b>Notre équipe le valide</b><span>Nous vérifions chaque compte avant de l'ouvrir.</span></li>
         <li><b>Vous recrutez</b><span>Décrivez vos postes, recevez les profils présélectionnés avec CV et coordonnées, parcourez la CVthèque.</span></li>
       </ol>
       ${creation ? `<p class="aide">Créer un compte ne vous engage à rien. Les tarifs ne s'appliquent qu'au recrutement que vous nous confiez : <a href="recruter.html">voir nos formules</a>.</p>`
@@ -71,6 +85,7 @@ function ecranConnexion(mode = "connexion", message = "") {
     </aside>
     </div>`;
   zone.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", () => ecranConnexion(b.dataset.mode)));
+  brancherChoixType();
   $("#oubli")?.addEventListener("click", motDePasseOublie);
   $("#form-acces").addEventListener("submit", (e) => (creation ? creerCompte(e) : seConnecter(e)));
 }
@@ -94,8 +109,9 @@ async function creerCompte(e) {
   const f = new FormData(e.target);
   const err = $("#erreur-acces");
   err.textContent = "";
-  const d = Object.fromEntries(["nom", "entreprise", "fonction", "telephone"].map((k) => [k, String(f.get(k) || "").trim()]));
+  const d = Object.fromEntries(["nom", "entreprise", "fonction", "telephone", "type_compte"].map((k) => [k, String(f.get(k) || "").trim()]));
   const email = String(f.get("email") || "").trim();
+  if (!d.type_compte) return (err.textContent = "Indiquez si vous êtes une entreprise ou un cabinet partenaire.");
   const mdp = String(f.get("mdp") || "");
   if (d.nom.length < 2 || d.entreprise.length < 2) return (err.textContent = "Indiquez votre nom et votre entreprise.");
   if (d.telephone.replace(/\D/g, "").length < 8) return (err.textContent = "Indiquez un numéro de téléphone joignable.");
@@ -143,7 +159,7 @@ function nouveauMotDePasse() {
 // Compte : en attente, suspendu, validé
 // =====================================================================
 async function afficher(session) {
-  if (!session) return ecranConnexion(location.hash === "#inscription" ? "creation" : "connexion");
+  if (!session) return ecranConnexion(/^#inscription/.test(location.hash) ? "creation" : "connexion");
   $("#email-recruteur").textContent = session.user.email;
   $("#deconnexion").hidden = false;
   let { data: compte, error } = await sb.rpc("mon_compte_recruteur");
@@ -166,7 +182,7 @@ async function afficher(session) {
   }
   if (!compte) return completerProfil();
   if (compte.equipe) {
-    zone.innerHTML = panneau("Vous êtes connecté(e) avec un compte de l'équipe", "L'espace recruteur est réservé aux recruteurs. Votre espace de travail est ici :", `<p style="margin-top:1rem"><a class="bouton" href="espace.html">Ouvrir l'espace équipe</a></p>`);
+    zone.innerHTML = panneau("Vous êtes connecté(e) avec un compte de l'équipe", "L'espace pro est réservé aux entreprises et aux recruteurs partenaires. Votre espace de travail est ici :", `<p style="margin-top:1rem"><a class="bouton" href="espace.html">Ouvrir l'espace équipe</a></p>`);
     return;
   }
   etat.compte = compte;
@@ -179,7 +195,7 @@ async function afficher(session) {
   }
   if (compte.statut === "suspendu") {
     $("#onglets").hidden = true;
-    zone.innerHTML = panneau("Accès suspendu", `Votre accès à l'espace recruteur n'est pas actif. Contactez ${esc(ORGA)} pour en savoir plus.`);
+    zone.innerHTML = panneau("Accès suspendu", `Votre accès à l'espace pro n'est pas actif. Contactez ${esc(ORGA)} pour en savoir plus.`);
     return;
   }
   $("#onglets").hidden = false;
@@ -190,16 +206,18 @@ async function afficher(session) {
 function completerProfil() {
   $("#onglets").hidden = true;
   zone.innerHTML = `<div class="etape connexion-recruteur"><h2>Dernière étape : présentez-vous</h2>
-    <form id="form-profil" novalidate><div class="grille deux">
+    <form id="form-profil" novalidate>${choixType(typeDemande())}<div class="grille deux">
       <label class="champ"><span>Votre nom</span><input type="text" name="nom" required maxlength="120"></label>
-      <label class="champ"><span>Entreprise ou cabinet</span><input type="text" name="entreprise" required maxlength="160"></label>
+      <label class="champ"><span id="libelle-structure">${libelleStructure(typeDemande())}</span><input type="text" name="entreprise" required maxlength="160"></label>
       <label class="champ"><span>Fonction <small>(facultatif)</small></span><input type="text" name="fonction" maxlength="120"></label>
       <label class="champ"><span>Téléphone (WhatsApp)</span><input type="tel" name="telephone" required maxlength="40"></label>
     </div><div class="envoi" style="justify-content:flex-start"><button class="bouton" type="submit">Envoyer ma demande d'accès</button></div><p class="erreur" id="erreur-profil" role="alert"></p></form></div>`;
+  brancherChoixType();
   $("#form-profil").addEventListener("submit", async (e) => {
     e.preventDefault();
     const f = new FormData(e.target);
-    const d = Object.fromEntries(["nom", "entreprise", "fonction", "telephone"].map((k) => [k, String(f.get(k) || "").trim()]));
+    const d = Object.fromEntries(["nom", "entreprise", "fonction", "telephone", "type_compte"].map((k) => [k, String(f.get(k) || "").trim()]));
+    if (!d.type_compte) return ($("#erreur-profil").textContent = "Indiquez si vous êtes une entreprise ou un cabinet partenaire.");
     if (d.nom.length < 2 || d.entreprise.length < 2 || d.telephone.replace(/\D/g, "").length < 8) return ($("#erreur-profil").textContent = "Nom, entreprise et téléphone sont obligatoires.");
     const { error } = await sb.rpc("inscrire_recruteur", { d });
     if (error) return ($("#erreur-profil").textContent = "Envoi impossible. Réessayez.");

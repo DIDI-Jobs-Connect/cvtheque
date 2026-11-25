@@ -1493,6 +1493,9 @@ async function chargerRecruteurs() {
   if (!error) etat.recruteurs = data;
 }
 
+// Type de compte pro : entreprise qui recrute, ou cabinet / recruteur partenaire (supabase/types-comptes.sql).
+const typeCompte = (r) => (r.type_compte ? `<span class="type-pro ${r.type_compte === "entreprise" ? "entreprise" : ""}">${r.type_compte === "entreprise" ? "Entreprise" : "Cabinet partenaire"}</span>` : "");
+
 async function chargerRecruteursVue() {
   const [, demandes] = await Promise.all([
     chargerRecruteurs(),
@@ -1519,12 +1522,12 @@ async function chargerRecruteursVue() {
         : `<button type="button" class="bouton discret petit" data-acces="${a.id}" data-acces-statut="${a.statut === "accorde" ? "refuse" : "accorde"}">${a.statut === "accorde" ? "Retirer l'accès" : "Accorder finalement"}</button>`}</div>
     </li>`;
   $("#contenu").innerHTML = `
-    <div class="resume"><h1>Recruteurs</h1><div class="outils"><a class="bouton discret petit" href="${BASE}espace-recruteur.html" target="_blank" rel="noopener">Ouvrir l'espace recruteur</a><button type="button" class="bouton petit secondaire" data-action="copier-lien-espace-recruteur">Copier le lien d'inscription</button></div></div>
+    <div class="resume"><h1>Entreprises et recruteurs</h1><div class="outils"><a class="bouton discret petit" href="${BASE}espace-recruteur.html" target="_blank" rel="noopener">Ouvrir l'espace recruteur</a><button type="button" class="bouton petit secondaire" data-action="copier-lien-entreprise">Lien d'inscription entreprise</button><button type="button" class="bouton petit secondaire" data-action="copier-lien-partenaire">Lien d'inscription partenaire</button></div></div>
     <div class="bord deux-colonnes" style="margin-top:0">
       <section class="panneau">
         <div class="panneau-titre"><h2>Comptes à valider</h2>${attente.length ? `<span class="tampon retard">${attente.length}</span>` : ""}</div>
         ${attente.length ? `<ul class="demandes-recues" style="list-style:none;padding:0">${attente.map((r) => `<li class="demande-recue">
-            <div class="demande-recue-tete"><b>${esc(r.nom)}</b><span>${esc(r.entreprise)}</span><span class="aide">${esc(r.fonction || "")}</span></div>
+            <div class="demande-recue-tete"><b>${esc(r.nom)}</b><span>${esc(r.entreprise)}</span>${typeCompte(r)}<span class="aide">${esc(r.fonction || "")}</span></div>
             <p class="aide">${esc(r.email)}${r.telephone ? `, ${esc(r.telephone)}` : ""} · inscrit(e) le ${jour(r.cree_le)}</p>
             <label class="champ"><span>Rattacher à une entreprise <small>(facultatif)</small></span><select data-rattacher="${r.user_id}">${options(etat.entreprises.map((e) => [e.id, e.nom]), "Aucune", r.entreprise_id)}</select></label>
             <div class="envoi">
@@ -1533,7 +1536,7 @@ async function chargerRecruteursVue() {
               <button type="button" class="bouton discret petit" data-compte="${r.user_id}" data-compte-statut="suspendu">Refuser</button>
             </div></li>`).join("")}</ul>` : `<p class="aide">Aucun compte en attente. Partagez le lien d'inscription aux recruteurs avec qui vous travaillez.</p>`}
         <h2 class="sous-titre">Comptes</h2>
-        ${valides.length ? `<ul class="contacts">${valides.map((r) => `<li><span><b>${esc(r.nom)}</b><small>${esc(r.entreprise)}${r.entreprises?.nom ? ` (${esc(r.entreprises.nom)})` : ""} · ${esc(r.email)}</small></span>
+        ${valides.length ? `<ul class="contacts">${valides.map((r) => `<li><span><b>${esc(r.nom)}</b> ${typeCompte(r)}<small>${esc(r.entreprise)}${r.entreprises?.nom ? ` (${esc(r.entreprises.nom)})` : ""} · ${esc(r.email)}</small></span>
             <span class="contact-actions"><span class="tampon ${r.statut === "valide" ? "place" : "archive"}">${r.statut === "valide" ? "Actif" : "Suspendu"}</span>
             <button type="button" class="bouton discret petit" data-compte="${r.user_id}" data-compte-statut="${r.statut === "valide" ? "suspendu" : "valide"}">${r.statut === "valide" ? "Suspendre" : "Réactiver"}</button></span></li>`).join("")}</ul>` : `<p class="aide">Aucun compte validé pour l'instant.</p>`}
       </section>
@@ -1895,7 +1898,9 @@ document.addEventListener("click", async (e) => {
     case "matching": return matching();
     case "importer-cv": return ouvrirImportCv();
     case "importer-offre": return ouvrirImportOffre();
-    case "copier-lien-espace-recruteur": return copier(`${BASE}espace-recruteur.html`, "Lien de l'espace recruteur copié : partagez-le aux recruteurs.");
+    case "copier-lien-espace-recruteur": return copier(`${BASE}espace-recruteur.html`, "Lien de l'espace pro copié.");
+    case "copier-lien-entreprise": return copier(`${BASE}espace-recruteur.html#inscription-entreprise`, "Lien d'inscription pour les entreprises copié.");
+    case "copier-lien-partenaire": return copier(`${BASE}espace-recruteur.html#inscription-partenaire`, "Lien d'inscription pour les recruteurs partenaires copié.");
     case "copier-lien-offre": return copier(lienOffre(etat.posteOuvert.d), "Lien copié : les candidats arrivent directement sur ce poste.");
     case "creer-lien-recruteur": {
       const d = etat.posteOuvert.d;

@@ -56,6 +56,9 @@ Même chose avec **`supabase/offres.sql`** (après `crm.sql`) : **New query**, c
 4. Pour que les recruteurs voient le **téléphone et l'email** des candidats que vous leur avez
    accordés ou présentés : **New query**, collez **`supabase/contacts.sql`** → **Run**.
    Le catalogue anonyme et les liens privés par offre n'affichent jamais de coordonnées.
+5. Pour distinguer les **entreprises** des **cabinets partenaires** : **New query**, collez
+   **`supabase/types-comptes.sql`** → **Run**. Liens d'inscription : `espace-recruteur.html#inscription-entreprise`
+   et `espace-recruteur.html#inscription-partenaire`.
 
 ## 3. Créer votre compte d'accès
 

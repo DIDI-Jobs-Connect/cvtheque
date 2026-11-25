@@ -881,3 +881,15 @@ dialog.large { width: min(860px, calc(100% - 2rem)); }
   .liens-recruteur a { padding: 0.4rem 0.5rem; font-size: 0.88rem; }
   .actions-hero .bouton { flex: 1 1 100%; }
 }
+
+/* Type de compte pro */
+.choix-type { margin: 0; padding: 0; border: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; min-width: 0; }
+.choix-type legend { margin-bottom: 0.5rem; padding: 0; font-weight: 700; }
+.type-compte { display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.8rem 0.9rem; border: 1px solid var(--trait); border-radius: var(--rayon); cursor: pointer; background: var(--papier); min-width: 0; }
+.type-compte:has(input:checked) { border-color: var(--action); background: color-mix(in srgb, var(--action) 7%, var(--papier)); box-shadow: 0 0 0 1px var(--action); }
+.type-compte input { margin-top: 0.2rem; accent-color: var(--action); flex: none; }
+.type-compte span { display: grid; gap: 0.1rem; min-width: 0; }
+.type-compte small { color: var(--encre-2); }
+.type-pro { display: inline-block; padding: 0.05rem 0.5rem; border-radius: 99px; font-size: 0.75rem; font-weight: 700; background: color-mix(in srgb, #7b3f8e 12%, var(--papier)); color: #7b3f8e; }
+.type-pro.entreprise { background: color-mix(in srgb, var(--ok) 12%, var(--papier)); color: var(--ok); }
+@media (max-width: 520px) { .choix-type { grid-template-columns: 1fr; } }
