@@ -8,7 +8,7 @@ export const CONFIG = {
   supabaseUrl: "https://orgnclnbwrmsuluntmrr.supabase.co",
   supabaseCle: "sb_publishable_vIr1c_a8DcHWvVr9lc7jew_UnKtFYF6",
   // Lien de votre chaîne WhatsApp, proposé après un dépôt (laisser vide pour ne rien afficher).
-  chaineWhatsapp: "",
+  chaineWhatsapp: "https://whatsapp.com/channel/0029VbCvS879WtC1T1Xq8L0b",
   // Numéro WhatsApp affiché aux entreprises et aux recruteurs (ex. "22901XXXXXXXX"), vide = masqué.
   whatsappContact: "2290154776858",
   // Formules proposées aux entreprises sur la page « Vous recrutez ? ».

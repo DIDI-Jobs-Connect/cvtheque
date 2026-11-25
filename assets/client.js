@@ -1,5 +1,5 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/+esm";
-import { CONFIG } from "./config.js?v=10";
+import { CONFIG } from "./config.js?v=11";
 
 export const configuree = Boolean(CONFIG.supabaseUrl && CONFIG.supabaseCle);
 export const sb = configuree ? createClient(CONFIG.supabaseUrl, CONFIG.supabaseCle) : null;
