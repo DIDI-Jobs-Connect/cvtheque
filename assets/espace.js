@@ -561,7 +561,8 @@ function rendreDossier() {
       </div>
       <div class="actions">
         ${c.cv_chemin ? `<button type="button" class="bouton petit" data-action="voir-cv">Voir le CV</button>
-          <button type="button" class="bouton secondaire petit" data-action="telecharger-cv">Télécharger</button>` : ""}
+          <button type="button" class="bouton secondaire petit" data-action="telecharger-cv">Télécharger</button>
+          <button type="button" class="bouton secondaire petit" data-action="analyser-cv">Analyser le CV</button>` : ""}
         ${wa ? `<a class="bouton secondaire petit" target="_blank" rel="noopener" href="https://wa.me/${wa}?text=${encodeURIComponent(`Bonjour ${c.prenom}, `)}">WhatsApp</a>` : ""}
         ${c.telephone ? `<a class="bouton discret petit" href="tel:${esc(c.telephone.replace(/[^\d+]/g, ""))}">Appeler</a>` : ""}
         ${c.email ? `<a class="bouton discret petit" href="mailto:${esc(c.email)}">Email</a>` : ""}
@@ -574,6 +575,7 @@ function rendreDossier() {
       </div>
     </div>
     <section id="zone-apercu" hidden></section>
+    <section id="zone-analyse" class="zone-analyse" hidden aria-live="polite"></section>
     <section>
       <h3>Postes et pipeline</h3>
       ${liens.length ? `<div class="propositions">${liens.map((l) => `<div class="proposition">
@@ -662,6 +664,70 @@ async function voirCv() {
   } catch (err) {
     echec(err, "Impossible d'ouvrir le CV.");
   }
+}
+
+// ---------- Analyse du CV d'une fiche existante ----------
+// Relit le CV déjà enregistré : ce qu'il apporte à la fiche, et les postes ouverts qui lui correspondent.
+async function analyserCvFiche() {
+  const { c, liens } = etat.ouvert;
+  const zone = $("#zone-analyse");
+  zone.hidden = false;
+  zone.innerHTML = `<h3>Analyse du CV</h3><p class="aide">Lecture du CV en cours…</p>`;
+  zone.scrollIntoView({ behavior: reduit() ? "auto" : "smooth", block: "start" });
+  let texte = "", erreur = null;
+  try {
+    const reponse = await fetch(await lienCv(c.cv_chemin));
+    if (!reponse.ok) throw new Error(String(reponse.status));
+    const nom = c.cv_nom || c.cv_chemin.split("/").pop();
+    ({ texte, erreur } = await lireTexteCv(new File([await reponse.blob()], nom)));
+  } catch (err) {
+    console.warn(err);
+    erreur = "Le CV n'a pas pu être téléchargé. Réessayez dans un instant.";
+  }
+  if (!texte) { zone.innerHTML = `<h3>Analyse du CV</h3><p class="manque-resume">${esc(erreur || "Ce CV n'a pas pu être lu.")}</p>`; return; }
+
+  const lu = analyserCv(texte);
+  const CHAMPS = [["telephone", "Téléphone"], ["email", "Email"], ["ville", "Ville"], ["experience", "Expérience (années)"], ["niveau", "Niveau d'études"], ["competences", "Compétences"], ["langues", "Langues"]];
+  const memes = (a, b) => normal(String(a)).replace(/\s+/g, "") === normal(String(b)).replace(/\s+/g, "");
+  const apports = CHAMPS.filter(([k]) => lu[k] != null && lu[k] !== "" && (c[k] == null || c[k] === ""));
+  const differences = CHAMPS.filter(([k]) => lu[k] != null && lu[k] !== "" && c[k] != null && c[k] !== "" && !memes(lu[k], c[k]) && !["competences", "langues"].includes(k));
+  const manquants = CHAMPS.slice(0, 4).filter(([k]) => (lu[k] == null || lu[k] === "") && (c[k] == null || c[k] === "")).map(([, l]) => l.toLowerCase());
+  etat.analyse = { lu, apports: apports.map(([k]) => k) };
+
+  // Compatibilité avec chaque poste ouvert, en combinant le CV et la fiche.
+  const profil = { ...lu, ville: c.ville || lu.ville, experience: c.experience ?? lu.experience, niveau: c.niveau || lu.niveau, titre: [lu.titre, c.postes].filter(Boolean).join(" ") };
+  const postes = etat.demandes.filter((d) => d.statut === "ouverte")
+    .map((d) => ({ d, ...scoreCv(`${texte} ${c.postes} ${c.competences || ""}`, profil, d), lien: liens.find((l) => l.demande_id === d.id) }))
+    .sort((a, b) => b.score - a.score).slice(0, 6);
+  const conseil = (s) => ({ presente: "à présenter", source: "à garder sous la main", refuse: "plutôt à écarter" })[etapeConseillee(s)];
+
+  zone.innerHTML = `
+    <h3>Analyse du CV</h3>
+    <h4>Ce que le CV apporte à la fiche</h4>
+    ${apports.length ? `<form id="form-apports" class="apports">${apports.map(([k, l]) => `<label class="case"><input type="checkbox" name="${k}" checked> <span><b>${l}</b> : ${esc(String(lu[k]))}${k === "experience" && lu.experienceEstimee ? " <small>(estimée d'après les dates)</small>" : ""}</span></label>`).join("")}
+        <div class="envoi" style="justify-content:flex-start"><button type="button" class="bouton petit" data-action="completer-fiche">Compléter la fiche</button></div></form>`
+      : `<p class="aide">Rien de nouveau : la fiche contient déjà ce que le CV indique.</p>`}
+    ${differences.length ? `<p class="aide">Différent du CV : ${differences.map(([k, l]) => `${l.toLowerCase()} « ${esc(String(lu[k]))} » sur le CV, « ${esc(String(c[k]))} » sur la fiche`).join(" ; ")}. Vérifiez avec le candidat.</p>` : ""}
+    ${manquants.length ? `<p class="manque-resume">Introuvable sur la fiche et dans le CV : ${manquants.join(", ")}.</p>` : ""}
+    <h4>Postes ouverts qui lui correspondent</h4>
+    ${postes.length ? `<ul class="postes-analyse">${postes.map((p) => `<li>
+        <span class="jauge-compat ${p.score >= 65 ? "" : p.score >= 40 ? "moyen" : "faible"}"><b>${p.score} %</b></span>
+        <span class="poste-analyse"><button type="button" class="lien" data-poste="${p.d.id}">${esc(p.d.titre)}</button>${p.d.entreprises?.nom ? `, ${esc(p.d.entreprises.nom)}` : ""}
+          <small>${esc(p.raisons.join(" · ") || "peu de points communs")}. Conseil : ${conseil(p.score)}.</small></span>
+        ${p.lien ? `<span class="aide">Déjà dans le pipeline : ${esc(libelleEtape(p.lien.etape))}</span>`
+          : `<button type="button" class="bouton secondaire petit" data-action="ajouter-analyse" data-demande="${p.d.id}">Ajouter (Sourcé)</button>`}
+      </li>`).join("")}</ul>` : `<p class="aide">Aucun poste ouvert pour l'instant.</p>`}`;
+}
+
+async function completerFicheDepuisCv() {
+  const { lu } = etat.analyse || {};
+  if (!lu) return;
+  const coches = [...$("#form-apports").querySelectorAll("input:checked")].map((i) => i.name);
+  if (!coches.length) return flash("Cochez au moins une information.");
+  const maj = Object.fromEntries(coches.map((k) => [k, lu[k]]));
+  if (maj.telephone) maj.telephone_chiffres = maj.telephone.replace(/\D/g, "").replace(/^(00)?229/, "") || null;
+  await majFiche(maj, `Fiche complétée : ${coches.length} ${pluriel(coches.length, "information", "informations")}.`);
+  await analyserCvFiche();
 }
 
 async function supprimerFiche() {
@@ -1775,6 +1841,13 @@ document.addEventListener("click", async (e) => {
     case "fermer-fenetre": return cible.closest("dialog").close();
     case "fermer-large": return $("#fenetre-large").close();
     case "voir-cv": return voirCv();
+    case "analyser-cv": return analyserCvFiche();
+    case "completer-fiche": return completerFicheDepuisCv();
+    case "ajouter-analyse": {
+      await ajouterAuPipeline(ds.demande, etat.ouvert.c.id);
+      await ouvrirFiche(etat.ouvert.c.id, false);
+      return analyserCvFiche();
+    }
     case "telecharger-cv":
       try { location.href = await lienCv(etat.ouvert.c.cv_chemin, etat.ouvert.c.cv_nom, true); } catch (err) { echec(err, "Téléchargement impossible."); }
       return;

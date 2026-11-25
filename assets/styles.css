@@ -832,3 +832,13 @@ dialog.large { width: min(860px, calc(100% - 2rem)); }
 .ligne-cv input.manque { border-color: color-mix(in srgb, var(--tampon) 55%, var(--trait)); background: color-mix(in srgb, var(--tampon) 5%, var(--papier)); }
 .jauge-compat.moyen { background: color-mix(in srgb, var(--ambre) 18%, var(--papier)); color: #8a5a12; }
 .jauge-compat.faible { background: color-mix(in srgb, var(--tampon) 10%, var(--papier)); color: var(--tampon); }
+
+/* Analyse du CV d'une fiche */
+.zone-analyse h4 { margin: 0.9rem 0 0.4rem; font-size: 1rem; font-weight: 800; }
+.apports { display: grid; gap: 0.35rem; }
+.apports .case span { min-width: 0; overflow-wrap: anywhere; }
+.postes-analyse { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
+.postes-analyse li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.6rem; padding: 0.6rem 0; border-bottom: 1px solid var(--trait); }
+.poste-analyse { display: grid; gap: 0.15rem; min-width: 0; }
+.poste-analyse small { color: var(--encre-2); }
+@media (max-width: 520px) { .postes-analyse li { grid-template-columns: auto minmax(0, 1fr); } .postes-analyse li > :last-child { grid-column: 1 / -1; } }
