@@ -156,7 +156,7 @@ begin
   return coalesce((
     select jsonb_agg(x order by x.depuis desc) from (
       select c.id, c.prenom, c.nom, c.postes, c.domaine, c.ville, c.experience, c.niveau, c.competences,
-             c.langues, c.disponibilite, c.pretentions, c.cv_chemin, c.cv_nom,
+             c.langues, c.disponibilite, c.pretentions, c.cv_chemin, c.cv_nom, c.telephone, c.email,
              coalesce(a.decide_le, a.cree_le) as depuis
         from public.acces_cv a join public.candidats c on c.id = a.candidat_id
        where a.recruteur_id = auth.uid() and a.statut = 'accorde'
@@ -176,7 +176,7 @@ begin
         select jsonb_agg(jsonb_build_object(
           'id', c.id, 'prenom', c.prenom, 'nom', c.nom, 'postes', c.postes, 'domaine', c.domaine, 'ville', c.ville,
           'experience', c.experience, 'niveau', c.niveau, 'competences', c.competences, 'langues', c.langues,
-          'disponibilite', c.disponibilite, 'pretentions', c.pretentions, 'cv_chemin', c.cv_chemin, 'cv_nom', c.cv_nom,
+          'disponibilite', c.disponibilite, 'pretentions', c.pretentions, 'cv_chemin', c.cv_chemin, 'cv_nom', c.cv_nom, 'telephone', c.telephone, 'email', c.email,
           'etape', dc.etape, 'avis', dc.avis_recruteur, 'commentaire', dc.avis_commentaire) order by dc.modifie_le desc)
         from public.demande_candidats dc join public.candidats c on c.id = dc.candidat_id
         where dc.demande_id = d.id and dc.etape in ('presente', 'entretien', 'offre', 'place')), '[]')

@@ -20,7 +20,7 @@ const STATUT_PAR_ETAPE = { presente: "propose", entretien: "entretien", offre: "
 
 const etat = {
   vue: "accueil",
-  filtres: { domaine: "", statut: "", contrat: "", niveau: "", experience: "", ville: "", disponibilite: "" },
+  filtres: { domaine: "", statut: "", cv: "", contrat: "", niveau: "", experience: "", ville: "", disponibilite: "" },
   texte: "",
   tri: "recent",
   page: 0,
@@ -174,10 +174,11 @@ async function chargerATraiter() {
 
 async function chargerAccueil() {
   chargerATraiter();
-  const [bord, relances, derniers] = await Promise.all([
+  const [bord, relances, derniers, suivi] = await Promise.all([
     sb.rpc("tableau_de_bord"),
     sb.from("relances").select("*, candidats(id, prenom, nom), entreprises(id, nom), demandes(id, titre)").eq("fait", false).order("echeance").limit(40),
     sb.from("candidats").select(COLONNES_LISTE).order("cree_le", { ascending: false }).limit(6),
+    chargerSuiviCv(),
   ]);
   if (bord.error) {
     console.error(bord.error);
@@ -187,9 +188,64 @@ async function chargerAccueil() {
   etat.bord = bord.data || {};
   etat.relances = relances.data || [];
   etat.derniers = derniers.data || [];
+  etat.suivi = suivi;
   majPastille(etat.bord.demandes_entreprises);
   rendreAccueil();
   rendreFiltres();
+}
+
+// Suivi des CV : déposés, manquants, et effet des relances (email et WhatsApp).
+async function chargerSuiviCv() {
+  try {
+    const [avec, sans, notes] = await Promise.all([
+      sb.from("candidats").select("id", { count: "exact", head: true }).neq("statut", "archive").not("cv_chemin", "is", null),
+      sb.from("candidats").select("id, telephone, email").neq("statut", "archive").is("cv_chemin", null).range(0, 9999),
+      sb.from("notes").select("candidat_id, texte").in("texte", [MARQUE_EMAIL, MARQUE_WA]).range(0, 9999),
+    ]);
+    if (avec.error || sans.error || notes.error) throw avec.error || sans.error || notes.error;
+    const sansIds = new Set(sans.data.map((c) => c.id));
+    const parEmail = new Set(notes.data.filter((n) => n.texte === MARQUE_EMAIL).map((n) => n.candidat_id));
+    const parWa = new Set(notes.data.filter((n) => n.texte === MARQUE_WA).map((n) => n.candidat_id));
+    const relances = new Set([...parEmail, ...parWa]);
+    const relancesSansCv = [...relances].filter((id) => sansIds.has(id)).length;
+    return {
+      avec: avec.count || 0,
+      sans: sansIds.size,
+      joignablesWa: sans.data.filter((c) => c.telephone).length,
+      joignablesEmail: sans.data.filter((c) => c.email).length,
+      parEmail: parEmail.size,
+      parWa: parWa.size,
+      relances: relances.size,
+      recus: relances.size - relancesSansCv,
+      jamais: sansIds.size - relancesSansCv,
+    };
+  } catch (err) {
+    console.error(err);
+    return null;
+  }
+}
+
+function panneauSuiviCv() {
+  const s = etat.suivi;
+  if (!s) return "";
+  const total = s.avec + s.sans;
+  const taux = total ? Math.round((s.avec / total) * 100) : 0;
+  const tauxRelance = s.relances ? Math.round((s.recus / s.relances) * 100) : 0;
+  return `<section class="panneau suivi-cv">
+      <div class="panneau-titre"><h2>Suivi des CV</h2><span class="tampon ${taux >= 80 ? "place" : "propose"}">${taux} % des fiches ont un CV</span></div>
+      <div class="jauge" role="img" aria-label="${s.avec} fiches avec CV et ${s.sans} sans CV"><i style="--w:${taux}%"></i></div>
+      <div class="chiffres-cv">
+        <div><b data-compte="${s.avec}">${s.avec}</b><span>${pluriel(s.avec, "CV déposé", "CV déposés")}</span></div>
+        <div class="manque"><b data-compte="${s.sans}">${s.sans}</b><span>${pluriel(s.sans, "CV manquant", "CV manquants")}</span><small>${s.joignablesWa} joignables sur WhatsApp, ${s.joignablesEmail} par email</small></div>
+        <div><b data-compte="${s.relances}">${s.relances}</b><span>${pluriel(s.relances, "personne relancée", "personnes relancées")}</span><small>${s.parEmail} par email, ${s.parWa} sur WhatsApp</small></div>
+        <div class="gagne"><b data-compte="${s.recus}">${s.recus}</b><span>${pluriel(s.recus, "CV reçu après relance", "CV reçus après relance")}</span><small>${s.relances ? `${tauxRelance} % des relancés ont répondu` : "Pas encore de relance"}</small></div>
+      </div>
+      ${s.sans ? `<p class="aide">${s.jamais} ${pluriel(s.jamais, "fiche sans CV n'a", "fiches sans CV n'ont")} encore jamais été ${pluriel(s.jamais, "relancée", "relancées")}.</p>` : ""}
+      <div class="envoi">
+        <button type="button" class="bouton petit" data-action="voir-sans-cv">Voir les fiches sans CV</button>
+        ${s.sans ? `<button type="button" class="bouton secondaire petit" data-action="relance-cv">Relancer sur WhatsApp</button>` : ""}
+      </div>
+    </section>`;
 }
 
 function ligneRelance(r) {
@@ -238,6 +294,7 @@ function rendreAccueil() {
       ${tuile(b.en_cours, pluriel(b.en_cours, "candidat en process", "candidats en process"), "sur les postes ouverts", "postes")}
       ${tuile(b.places_30j, pluriel(b.places_30j, "placement", "placements"), "ces 30 derniers jours", "")}
     </div>
+    ${panneauSuiviCv()}
     <div class="bord">
       <section class="panneau">
         <div class="panneau-titre"><h2>À faire</h2>${enRetard.length ? `<span class="tampon retard">${enRetard.length} en retard</span>` : ""}</div>
@@ -345,6 +402,7 @@ function rendreFiltres() {
       </div>
     </div>
     <label class="champ"><span>Statut</span><select data-filtre="statut">${options(STATUTS, "Tous sauf archivés", f.statut)}</select></label>
+    <label class="champ"><span>CV</span><select data-filtre="cv">${options([["avec", "Avec CV"], ["sans", "Sans CV (à relancer)"]], "Tous", f.cv)}</select></label>
     <label class="champ"><span>Contrat</span><select data-filtre="contrat">${options(CONTRATS, "Tous", f.contrat)}</select></label>
     <label class="champ"><span>Niveau d'études</span><select data-filtre="niveau">${options(NIVEAUX, "Tous", f.niveau)}</select></label>
     <label class="champ"><span>Expérience minimale (ans)</span><input type="number" min="0" max="60" data-filtre="experience" value="${esc(f.experience)}"></label>
@@ -377,6 +435,8 @@ function requeteFiches(colonnes, avecCompte) {
   let q = sb.from("candidats").select(colonnes, avecCompte ? { count: "exact" } : undefined);
   if (f.domaine) q = q.eq("domaine", f.domaine);
   q = f.statut ? q.eq("statut", f.statut) : q.neq("statut", "archive");
+  if (f.cv === "avec") q = q.not("cv_chemin", "is", null);
+  else if (f.cv === "sans") q = q.is("cv_chemin", null);
   if (f.contrat) q = q.contains("contrats", [f.contrat]);
   if (f.niveau) q = q.eq("niveau", f.niveau);
   if (f.experience !== "" && !Number.isNaN(Number(f.experience))) q = q.gte("experience", Number(f.experience));
@@ -410,7 +470,7 @@ function ligneFiche(c, i = 0) {
   ].filter(Boolean);
   return `<button type="button" class="fiche" data-fiche="${c.id}" style="--c:${couleurDomaine(c.domaine)};--i:${i}" aria-current="${etat.ouvert?.c.id === c.id}">
       <span><span class="qui">${esc(c.prenom)} ${esc(c.nom)}</span><br><span class="poste">${esc(c.postes)}</span></span>
-      <span class="cote"><span class="tampon ${esc(c.statut)}">${esc(libelleStatut(c.statut))}</span>${c.note ? `<span class="etoiles" aria-label="${c.note} sur 5">${"★".repeat(c.note)}</span>` : ""}</span>
+      <span class="cote">${c.cv_chemin ? "" : `<span class="tampon sans-cv">Sans CV</span>`}<span class="tampon ${esc(c.statut)}">${esc(libelleStatut(c.statut))}</span>${c.note ? `<span class="etoiles" aria-label="${c.note} sur 5">${"★".repeat(c.note)}</span>` : ""}</span>
       <span class="details">${details.map((d) => `<span>${esc(d)}</span>`).join("")}<span class="date">Reçu le ${jour(c.cree_le)}</span></span>
     </button>`;
 }
@@ -687,6 +747,7 @@ function ouvrirFormulaireFiche(c = null) {
 
 // ---------- Relance WhatsApp des fiches sans CV ----------
 const MARQUE_WA = "Relance CV envoyée par WhatsApp";
+const MARQUE_EMAIL = "Relance CV envoyée par email";
 const LIEN_RELANCE = `${BASE}?source=relance-whatsapp`;
 
 async function ouvrirRelanceCv() {
@@ -1542,6 +1603,15 @@ document.addEventListener("click", async (e) => {
     case "nouvelle-fiche": return ouvrirFormulaireFiche();
     case "exporter": return exporter();
     case "relance-cv": return ouvrirRelanceCv();
+    case "voir-sans-cv": {
+      Object.keys(etat.filtres).forEach((k) => (etat.filtres[k] = ""));
+      etat.filtres.cv = "sans";
+      etat.texte = "";
+      $("#recherche").value = "";
+      etat.page = 0;
+      rendreFiltres();
+      return changerVue("fiches");
+    }
     case "relance-wa": return marquerRelanceWa(cible);
     case "nouvelle-relance": return ouvrirFormulaireRelance();
     case "relance-candidat": return ouvrirFormulaireRelance({ candidat: etat.ouvert.c });

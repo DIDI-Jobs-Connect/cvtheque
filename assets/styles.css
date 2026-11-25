@@ -139,7 +139,7 @@ fieldset { border: 0; margin: 0; min-width: 0; }
 .connexion form { width: min(400px, 100%); display: grid; gap: 1rem; }
 .connexion h1 { font-size: 2rem; font-weight: 800; }
 
-.appli { min-height: 100vh; display: grid; grid-template-rows: auto 1fr; }
+.appli { min-height: 100vh; display: grid; grid-template-rows: auto 1fr; grid-template-columns: minmax(0, 1fr); }
 .barre {
   position: sticky; top: 0; z-index: 5; min-height: 62px; display: flex; align-items: center; gap: 0.75rem;
   padding: 0.65rem 1rem; background: var(--papier); border-bottom: 1px solid var(--trait);
@@ -284,8 +284,11 @@ dialog .envoi { margin-top: 0.25rem; justify-content: flex-end; }
   .barre .recherche { order: 3; flex-basis: 100%; max-width: none; }
   .contenu { padding: 1rem 1rem 3rem 1.5rem; }
   .demandes { grid-template-columns: 1fr; }
-  .vues button { padding: 0.3rem 0.55rem; }
+  .vues button { padding: 0.3rem 0.55rem; flex: none; }
   .barre .compte span { display: none; }
+  /* Les 5 onglets ne tiennent pas sur un téléphone : ils passent sur leur propre ligne et défilent. */
+  .barre .vues { order: 4; flex-basis: 100%; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .barre .vues::-webkit-scrollbar { display: none; }
 }
 @media (max-width: 520px) {
   .fiche { grid-template-columns: 1fr; }
@@ -776,3 +779,22 @@ dialog.large { width: min(860px, calc(100% - 2rem)); }
   .onglets-recruteur { order: 3; width: 100%; overflow-x: auto; flex-wrap: nowrap; }
   .onglets-recruteur button { white-space: nowrap; }
 }
+
+/* Suivi des CV (tableau de bord de l'équipe) */
+.suivi-cv { margin-bottom: 1rem; }
+.suivi-cv .panneau-titre { flex-wrap: wrap; justify-content: space-between; }
+.jauge { height: 12px; margin-top: 0.9rem; border-radius: 99px; background: color-mix(in srgb, var(--tampon) 16%, var(--fond)); overflow: hidden; }
+.jauge i { display: block; height: 100%; width: var(--w); border-radius: inherit; background: var(--ok); animation: barre var(--lent) var(--courbe) both; }
+.chiffres-cv { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.9rem; margin: 1rem 0 0.4rem; }
+.chiffres-cv > div { display: grid; gap: 0.1rem; align-content: start; padding-left: 0.8rem; border-left: 3px solid var(--trait); min-width: 0; }
+.chiffres-cv b { font: 800 1.9rem/1 var(--titre); font-variant-numeric: tabular-nums; }
+.chiffres-cv span { font-weight: 700; }
+.chiffres-cv small { color: var(--encre-2); font-size: 0.82rem; }
+.chiffres-cv .manque { border-left-color: var(--tampon); }
+.chiffres-cv .manque b { color: var(--tampon); }
+.chiffres-cv .gagne { border-left-color: var(--ok); }
+.chiffres-cv .gagne b { color: var(--ok); }
+.tampon.sans-cv { color: var(--tampon); margin-right: 0.3rem; }
+.coordonnees a { color: var(--action); font-weight: 700; overflow-wrap: anywhere; }
+@media (max-width: 860px) { .chiffres-cv { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) { .jauge i { animation: none; } }

@@ -206,6 +206,24 @@ function changerOnglet(onglet) {
   if (onglet === "demande") return nouvelleDemande();
 }
 
+// Numéro au format WhatsApp : les numéros béninois sans indicatif reçoivent le 229.
+function numeroWhatsapp(tel) {
+  let d = String(tel || "").replace(/\D/g, "");
+  if (!d) return "";
+  if (d.startsWith("00")) d = d.slice(2);
+  else if (!String(tel).trim().startsWith("+") && !d.startsWith("229") && (d.length === 8 || d.length === 10)) d = "229" + d;
+  return d;
+}
+
+// Coordonnées : seulement pour les candidats que l'équipe a accordés ou présentés à ce recruteur.
+function contacts(p) {
+  if (!p.telephone && !p.email) return "";
+  return `<dl class="infos coordonnees">
+      ${p.telephone ? `<dt>Téléphone</dt><dd><a href="tel:${esc(String(p.telephone).replace(/[^\d+]/g, ""))}">${esc(p.telephone)}</a></dd>` : ""}
+      ${p.email ? `<dt>Email</dt><dd><a href="mailto:${esc(p.email)}">${esc(p.email)}</a></dd>` : ""}
+    </dl>`;
+}
+
 function carteProfil(p, i, demande) {
   return `<article class="profil-recruteur" style="--c:${couleurDomaine(p.domaine)};--i:${i}" data-id="${esc(p.id)}" ${demande ? `data-demande="${esc(demande)}"` : ""}>
       <div class="profil-tete">
@@ -218,8 +236,10 @@ function carteProfil(p, i, demande) {
         ${p.langues ? `<dt>Langues</dt><dd>${esc(p.langues)}</dd>` : ""}
         ${p.pretentions ? `<dt>Prétentions</dt><dd>${esc(p.pretentions)}</dd>` : ""}
       </dl>
+      ${contacts(p)}
       <div class="profil-actions">
         ${p.cv_chemin ? `<button type="button" class="bouton secondaire petit" data-cv="${esc(p.cv_chemin)}">Voir le CV</button>` : `<span class="aide">CV pas encore disponible : demandez-le à ${esc(ORGA)}.</span>`}
+        ${numeroWhatsapp(p.telephone) ? `<a class="bouton petit" target="_blank" rel="noopener" href="https://wa.me/${numeroWhatsapp(p.telephone)}?text=${encodeURIComponent(`Bonjour ${p.prenom}, je suis recruteur chez ${etat.compte?.entreprise || "notre entreprise"}. ${ORGA} m'a transmis votre CV. `)}">WhatsApp</a>` : ""}
       </div>
       ${demande ? `<form class="form-avis"><fieldset><legend>Votre avis</legend>
         <div class="choix-avis">${Object.entries(AVIS).map(([k, l]) => `<label class="avis ${k}"><input type="radio" name="avis" value="${k}"${p.avis === k ? " checked" : ""}> ${l}</label>`).join("")}</div>
@@ -239,7 +259,7 @@ async function mesPostes() {
       <p class="aide">${esc(c.entreprise)}</p>
       <h1>Bonjour ${esc(c.nom)}</h1>
       <p class="resume-recruteur">${data.length ? `<b>${data.length}</b> ${data.length > 1 ? "postes suivis" : "poste suivi"} par ${esc(ORGA)}.` : "Aucun poste pour le moment."}</p>
-      <p class="aide">Vous voyez ici les candidats que notre équipe a présélectionnés pour vous. Les coordonnées des candidats vous sont transmises par ${esc(ORGA)} pour organiser les entretiens.</p>
+      <p class="aide">Vous voyez ici les candidats que notre équipe a présélectionnés pour vous. Leurs coordonnées s'affichent sur chaque fiche : vous pouvez les contacter directement.</p>
     </section>
     ${data.length ? data.map((d) => `
       <section class="bloc-poste">
@@ -253,7 +273,7 @@ async function cvtheque() {
   zone.innerHTML = `
     <section class="entete-recruteur">
       <h1>CVthèque</h1>
-      <p class="aide">Les profils sont anonymes. Demandez le CV d'un candidat : notre équipe vérifie sa disponibilité et vous l'accorde. Il apparaît alors dans « CV accordés ».</p>
+      <p class="aide">Les profils sont anonymes. Demandez le CV d'un candidat : notre équipe vérifie sa disponibilité et vous l'accorde. Il apparaît alors dans « CV accordés », avec ses coordonnées.</p>
     </section>
     <div class="barre-offres" style="margin-top:1rem">
       <label class="recherche-offres"><span class="visuellement-cache">Rechercher</span><input type="search" id="q" placeholder="Métier, compétence, ville…" value="${esc(etat.q)}"></label>
@@ -310,7 +330,7 @@ async function accordes() {
   if (error) return (zone.innerHTML = panneau("Chargement impossible", "Réessayez dans un instant."));
   zone.innerHTML = `
     <section class="entete-recruteur"><h1>CV accordés</h1>
-      <p class="aide">Les profils dont ${esc(ORGA)} vous a accordé le CV. Pour rencontrer un candidat, écrivez-nous : nous organisons l'entretien.</p></section>
+      <p class="aide">Les profils dont ${esc(ORGA)} vous a accordé le CV. Vous pouvez contacter ces candidats directement par téléphone, WhatsApp ou email.</p></section>
     ${data.length ? `<div class="profils-recruteur">${data.map((p, i) => carteProfil(p, i, null)).join("")}</div>` : panneau("Aucun CV accordé pour l'instant", "Parcourez la CVthèque et demandez les CV qui vous intéressent.", `<p style="margin-top:1rem"><button class="bouton" type="button" data-onglet="cvtheque">Parcourir la CVthèque</button></p>`)}`;
 }
 

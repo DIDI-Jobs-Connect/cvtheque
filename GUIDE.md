@@ -53,6 +53,9 @@ Même chose avec **`supabase/offres.sql`** (après `crm.sql`) : **New query**, c
 3. **Authentication** → **URL Configuration** → **Site URL** :
    `https://didi-jobs-connect.github.io/cvtheque/espace-recruteur.html` (lien des emails
    « mot de passe oublié »).
+4. Pour que les recruteurs voient le **téléphone et l'email** des candidats que vous leur avez
+   accordés ou présentés : **New query**, collez **`supabase/contacts.sql`** → **Run**.
+   Le catalogue anonyme et les liens privés par offre n'affichent jamais de coordonnées.
 
 ## 3. Créer votre compte d'accès
 
