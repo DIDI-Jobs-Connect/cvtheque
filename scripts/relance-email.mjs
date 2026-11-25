@@ -63,7 +63,7 @@ Vous ne souhaitez plus figurer dans la CVthèque ? Répondez simplement « retra
   return { from: FROM, to: [c.email], subject: `${prenom ? prenom + ", il" : "Il"} manque votre CV pour vous proposer aux recruteurs`, text: texte, html };
 }
 
-let envoyes = 0, echecs = 0;
+let envoyes = 0, echecs = 0, raison = "";
 if (!ESSAI) {
   // Envoi par paquets de 50 (API « batch » de Resend), avec une pause entre les paquets.
   for (let i = 0; i < lot.length; i += 50) {
@@ -76,7 +76,10 @@ if (!ESSAI) {
     if (!r.ok) {
       echecs += paquet.length;
       const corps = await r.text().catch(() => "");
-      erreur(`Resend a refusé un paquet (${r.status}) : ${corps.slice(0, 200)}`);
+      let message = corps;
+      try { message = JSON.parse(corps).message || corps; } catch { /* texte brut */ }
+      raison = `${r.status} : ${String(message).slice(0, 300)}`;
+      erreur(`Resend a refusé un paquet (${raison})`);
       if (r.status === 401 || r.status === 403 || r.status === 422) break;
       continue;
     }
@@ -95,6 +98,8 @@ const resume = [
   `| Restant à relancer | ${aRelancer.length} |`,
   `| ${ESSAI ? "Seraient envoyés lors de ce lancement" : "Emails envoyés"} (maximum ${MAXIMUM}) | **${ESSAI ? lot.length : envoyes}** |`,
   ...(ESSAI ? [] : [`| Échecs | ${echecs} |`]),
+  "",
+  raison ? `**Raison du refus (Resend)** : ${raison}` : "",
   "",
   aRelancer.length > lot.length ? `Il en restera ${aRelancer.length - lot.length} : relancez demain (limite de l'offre gratuite Resend : 100 emails par jour).` : "",
 ].join("\n");
