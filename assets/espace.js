@@ -1,5 +1,5 @@
 import { CONFIG } from "./config.js?v=11";
-import { sb, configuree, esc, sansAccents, envoyerCv } from "./client.js?v=8";
+import { sb, configuree, esc, sansAccents, envoyerCv, verifierCv } from "./client.js?v=8";
 import {
   DOMAINES, CONTRATS, NIVEAUX, DISPONIBILITES, STATUTS, ETAPES, STATUTS_DEMANDE, TYPES_ACTIVITE, STATUTS_ENTREPRISE,
   couleurDomaine, libelleStatut, libelleEtape,
@@ -273,7 +273,7 @@ function barres(objet, libeller = (k) => k, couleur = () => "var(--action)") {
   return `<ul class="barres">${lignes.map(([k, n]) => `<li><span>${esc(libeller(k))}</span><i style="--w:${(n / max) * 100}%;--c:${couleur(k)}"></i><b>${n}</b></li>`).join("")}</ul>`;
 }
 
-const SOURCES = { chaine: "Chaîne WhatsApp", accompagnement: "Accompagnement", formulaire: "Formulaire", statut: "Statut WhatsApp", linkedin: "LinkedIn", facebook: "Facebook", "ajout par l'équipe": "Ajout manuel", inconnue: "Inconnue", site: "Site DIDI Jobs Connect", offre: "Candidature à une offre", "relance-site": "Relance des inscrits", "relance-email": "Relance par email", "relance-whatsapp": "Relance WhatsApp", "chaine-relance": "Relance chaîne WhatsApp" };
+const SOURCES = { chaine: "Chaîne WhatsApp", accompagnement: "Accompagnement", formulaire: "Formulaire", statut: "Statut WhatsApp", linkedin: "LinkedIn", facebook: "Facebook", "ajout par l'équipe": "Ajout manuel", inconnue: "Inconnue", site: "Site DIDI Jobs Connect", offre: "Candidature à une offre", "relance-site": "Relance des inscrits", "relance-email": "Relance par email", "relance-whatsapp": "Relance WhatsApp", "chaine-relance": "Relance chaîne WhatsApp", email: "CV reçu par email" };
 
 function rendreAccueil() {
   const b = etat.bord;
@@ -745,6 +745,111 @@ function ouvrirFormulaireFiche(c = null) {
   }, c ? "Enregistrer" : "Ajouter le candidat");
 }
 
+// ---------- CV reçus par email : plusieurs CV d'un coup sur un poste ----------
+const MOTS_FICHIER = new Set(["cv", "curriculum", "vitae", "resume", "mon", "ma", "de", "du", "des", "le", "la", "final", "version", "nouveau", "new", "doc", "pdf", "copie", "scan"]);
+/** Devine prénom et nom à partir du nom du fichier (« CV_Jean_DOSSOU.pdf » → Jean / DOSSOU). */
+function nomDepuisFichier(nomFichier) {
+  const mots = nomFichier.replace(/\.[a-z0-9]+$/i, "").split(/[\s_.\-()]+/)
+    .filter((m) => m && !/\d/.test(m) && !MOTS_FICHIER.has(m.toLowerCase()));
+  const majuscules = mots.filter((m) => m.length > 1 && m === m.toUpperCase());
+  const autres = mots.filter((m) => !majuscules.includes(m));
+  const joli = (m) => m.charAt(0).toUpperCase() + m.slice(1).toLowerCase();
+  if (majuscules.length && autres.length) return { prenom: autres.map(joli).join(" "), nom: majuscules.join(" ") };
+  if (mots.length >= 2) return { prenom: joli(mots[0]), nom: mots.slice(1).map((m) => m.toUpperCase()).join(" ") };
+  return { prenom: mots[0] ? joli(mots[0]) : "", nom: "" };
+}
+
+function ouvrirImportCv() {
+  const d = etat.posteOuvert.d;
+  let fichiers = [];
+  fenetre(`
+    <h2>Ajouter des CV reçus</h2>
+    <p class="aide">Pour le poste <b>${esc(d.titre)}</b>. Choisissez les CV reçus par email ou WhatsApp (PDF ou Word, 5 Mo maximum chacun), vérifiez les noms, puis ajoutez-les. Une personne déjà dans la CVthèque (même email ou même téléphone) n'est pas créée en double.</p>
+    <label class="fichier"><b>CV reçus</b><span class="aide">Vous pouvez en sélectionner plusieurs d'un coup.</span>
+      <input type="file" id="cv-multiples" multiple accept=".pdf,.doc,.docx"></label>
+    <div id="lignes-cv" class="lignes-cv"></div>
+    <label class="champ"><span>Étape dans le pipeline</span><select name="etape">
+      <option value="presente" selected>Présenté au client (le recruteur les voit tout de suite)</option>
+      <option value="source">Sourcé (je les trie d'abord)</option>
+    </select></label>
+    <label class="accord" style="margin-top:0"><input type="checkbox" name="consentement" required><span>Ces personnes ont envoyé leur CV pour cette offre : elles acceptent qu'il soit conservé et transmis au recruteur.</span></label>`,
+  async (f) => {
+    if (!fichiers.length) return "Choisissez au moins un CV.";
+    if (f.get("consentement") !== "on") return "Cochez la case d'accord des candidats avant d'ajouter les CV.";
+    const etape = val(f, "etape") || "presente";
+    const lignes = fichiers.map((fichier, i) => ({
+      fichier, prenom: val(f, `prenom-${i}`), nom: val(f, `nom-${i}`),
+      telephone: val(f, `telephone-${i}`), email: val(f, `email-${i}`)?.toLowerCase() ?? null,
+    }));
+    const incomplete = lignes.findIndex((l) => !l.prenom || !l.nom);
+    if (incomplete >= 0) return `Indiquez le prénom et le nom pour « ${lignes[incomplete].fichier.name} ».`;
+    const maintenant = new Date().toISOString();
+    const echecs = [];
+    let ajoutes = 0, existants = 0;
+    for (const l of lignes) {
+      try {
+        const chemin = await envoyerCv(l.fichier, "equipe");
+        const telChiffres = l.telephone ? l.telephone.replace(/\D/g, "").replace(/^(00)?229/, "") || null : null;
+        let existant = null;
+        if (l.email) existant = (await sb.from("candidats").select("id, cv_chemin, cv_nom, anciens_cv").eq("email", l.email).limit(1)).data?.[0] || null;
+        if (!existant && telChiffres) existant = (await sb.from("candidats").select("id, cv_chemin, cv_nom, anciens_cv").eq("telephone_chiffres", telChiffres).limit(1)).data?.[0] || null;
+        let id;
+        if (existant) {
+          const maj = { cv_chemin: chemin, cv_nom: l.fichier.name.slice(0, 200), modifie_le: maintenant };
+          if (existant.cv_chemin) maj.anciens_cv = [...(existant.anciens_cv || []), { chemin: existant.cv_chemin, nom: existant.cv_nom, remplace_le: maintenant }];
+          const { error } = await sb.from("candidats").update(maj).eq("id", existant.id);
+          if (error) throw error;
+          id = existant.id;
+          existants++;
+        } else {
+          const { data, error } = await sb.from("candidats").insert({
+            prenom: l.prenom, nom: l.nom, telephone: l.telephone, telephone_chiffres: telChiffres, email: l.email,
+            domaine: d.domaine || "Autre domaine", postes: d.titre, contrats: d.contrat ? [d.contrat] : [],
+            cv_chemin: chemin, cv_nom: l.fichier.name.slice(0, 200), source: "email", consentement_le: maintenant,
+          }).select("id").single();
+          if (error) throw error;
+          id = data.id;
+        }
+        const { error: e1 } = await sb.from("demande_candidats").upsert({ demande_id: d.id, candidat_id: id, etape, origine: "candidature" }, { onConflict: "demande_id,candidat_id", ignoreDuplicates: true });
+        if (e1) throw e1;
+        if (etape !== "source") {
+          await sb.from("demande_candidats").update({ etape, modifie_le: maintenant }).eq("demande_id", d.id).eq("candidat_id", id).in("etape", ["source", "contacte"]);
+          if (STATUT_PAR_ETAPE[etape]) await sb.from("candidats").update({ statut: STATUT_PAR_ETAPE[etape], modifie_le: maintenant }).eq("id", id);
+        }
+        ajoutes++;
+      } catch (err) {
+        console.error(err);
+        echecs.push(`${l.fichier.name} : ${/CV|fichier|Mo/.test(err?.message || "") ? err.message : "enregistrement impossible"}`);
+      }
+    }
+    if (d.jeton_recruteur && etape !== "source") await preparerPartage(d.id).catch(console.error);
+    await chargerDemandes();
+    if (etat.vue === "postes") await ouvrirPoste(d.id);
+    if (echecs.length) {
+      // On ferme quand même : les CV déjà enregistrés ne doivent pas être envoyés deux fois.
+      setTimeout(() => alert(`${ajoutes} ${pluriel(ajoutes, "CV ajouté", "CV ajoutés")}.\n\nNon ajoutés, à reprendre un par un :\n${echecs.join("\n")}`), 50);
+      return;
+    }
+    flash(`${ajoutes} ${pluriel(ajoutes, "CV ajouté", "CV ajoutés")} au poste${existants ? ` (dont ${existants} déjà ${pluriel(existants, "connu", "connus")} dans la CVthèque)` : ""}.`);
+  }, "Ajouter les CV");
+
+  const zone = $("#lignes-cv");
+  $("#cv-multiples").addEventListener("change", (e) => {
+    const refuses = [];
+    fichiers = [...e.target.files].filter((x) => { const v = verifierCv(x); if (v.erreur) refuses.push(`${x.name} : ${v.erreur}`); return !v.erreur; });
+    zone.innerHTML = (refuses.length ? `<p class="erreur">${refuses.map(esc).join("<br>")}</p>` : "") + fichiers.map((x, i) => {
+      const n = nomDepuisFichier(x.name);
+      return `<fieldset class="ligne-cv"><legend>${esc(x.name)}</legend>
+        <div class="grille deux">
+          <label class="champ"><span>Prénom</span><input type="text" name="prenom-${i}" required value="${esc(n.prenom)}"></label>
+          <label class="champ"><span>Nom</span><input type="text" name="nom-${i}" required value="${esc(n.nom)}"></label>
+          <label class="champ"><span>Téléphone <small>(facultatif)</small></span><input type="tel" name="telephone-${i}"></label>
+          <label class="champ"><span>Email <small>(facultatif)</small></span><input type="email" name="email-${i}"></label>
+        </div></fieldset>`;
+    }).join("");
+  });
+}
+
 // ---------- Relance WhatsApp des fiches sans CV ----------
 const MARQUE_WA = "Relance CV envoyée par WhatsApp";
 const MARQUE_EMAIL = "Relance CV envoyée par email";
@@ -864,6 +969,7 @@ function rendrePipeline() {
       <div class="envoi">
         <button type="button" class="bouton" data-action="matching">Profils compatibles</button>
         <button type="button" class="bouton secondaire" data-action="chercher-profils">Chercher dans la CVthèque</button>
+        <button type="button" class="bouton secondaire" data-action="importer-cv">Ajouter des CV reçus</button>
         <button type="button" class="bouton secondaire" data-action="copier-message">Message pour le client</button>
         <button type="button" class="bouton discret petit" data-action="relance-poste">Relance</button>
         <button type="button" class="bouton discret petit" data-action="modifier-poste">Modifier</button>
@@ -1099,10 +1205,14 @@ function analyserOffre(texte) {
   const lignes = texte.split(/\r?\n/).map((l) => l.replace(/^[\s*•\-–>#_]+|[\s*_]+$/g, "").trim()).filter(Boolean);
   const plat = normal(texte);
   const capture = (re) => { const m = texte.match(re); return m ? m[m.length - 1].trim().replace(/[.;]+$/, "") : null; };
-  let titre = capture(/(?:intitul[ée] du poste|poste(?: à pourvoir)?|fonction|profil recherch[ée])\s*[:\-–]\s*([^\n]{3,90})/i)
-    || capture(/recrute(?:nt)?\s+(?:un|une|des|d['’]un|d['’]une)?\s*\(?\d*\)?\s*([^\n,.]{3,80}?)(?:\s+(?:pour|à|au|en|H\/F|\(H\/F\))\b|[,.\n]|$)/i);
+  // Une ligne courte qui finit par « (H/F) » est presque toujours l'intitulé du poste.
+  const ligneHF = lignes.map((l) => l.replace(/^[^\p{L}\p{N}(]+|[^\p{L}\p{N})]+$/gu, ""))
+    .find((l) => l.length <= 90 && /\(?\s*\b[HF]\s*\/\s*[HF]\s*\)?$/i.test(l) && !/recrut/i.test(l));
+  let titre = ligneHF
+    || capture(/(?:intitul[ée] du poste|poste(?: à pourvoir)?|fonction|profil recherch[ée])\s*[:\-–]\s*([^\n]{3,90})/i)
+    || capture(/recrut(?:e|ent|ons)\s+(?:(?:rapidement|activement|urgemment|actuellement|aujourd['’]hui)\s+)?(?:(?:un\(e\)|une|un|des|son|sa|ses|leur|d['’]une|d['’]un)(?![\p{L}]))?\s*\(?\d*\)?\s*([^\n,.]{3,80}?)(?:\s+(?:pour|à|au|en)(?=\s|$)|\s*\(?H\/F\)?|[,.\n]|$)/iu);
   if (!titre) titre = lignes.find((l) => l.length <= 90 && !/^(offre|avis|appel)\b.*(emploi|recrutement|candidature)/i.test(normal(l)) && !/^(urgent|recrutement)$/i.test(l)) || lignes[0] || "";
-  titre = titre.replace(/\s*\(?H\s*\/\s*F\)?\s*$/i, "").replace(/^(un|une|des)\s+/i, "").trim();
+  titre = titre.replace(/\s*\(?\s*[HF]\s*\/\s*[HF]\s*\)?\s*$/i, "").replace(/^(un|une|des)\s+/i, "").trim();
   titre = titre.charAt(0).toUpperCase() + titre.slice(1);
 
   const ville = VILLES.find((v) => new RegExp(`\\b${normal(v).replace("-", "[- ]")}\\b`).test(plat)) || null;
@@ -1640,6 +1750,7 @@ document.addEventListener("click", async (e) => {
       return flash("Poste supprimé.");
     }
     case "matching": return matching();
+    case "importer-cv": return ouvrirImportCv();
     case "importer-offre": return ouvrirImportOffre();
     case "copier-lien-espace-recruteur": return copier(`${BASE}espace-recruteur.html`, "Lien de l'espace recruteur copié : partagez-le aux recruteurs.");
     case "copier-lien-offre": return copier(lienOffre(etat.posteOuvert.d), "Lien copié : les candidats arrivent directement sur ce poste.");

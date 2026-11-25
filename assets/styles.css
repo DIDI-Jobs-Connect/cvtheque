@@ -798,3 +798,8 @@ dialog.large { width: min(860px, calc(100% - 2rem)); }
 .coordonnees a { color: var(--action); font-weight: 700; overflow-wrap: anywhere; }
 @media (max-width: 860px) { .chiffres-cv { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (prefers-reduced-motion: reduce) { .jauge i { animation: none; } }
+
+/* Ajout de plusieurs CV reçus sur un poste */
+.lignes-cv { display: grid; gap: 0.7rem; margin: 0.6rem 0; }
+.ligne-cv { margin: 0; padding: 0.6rem 0.8rem 0.2rem; border: 1px solid var(--trait); border-radius: var(--rayon); min-width: 0; }
+.ligne-cv legend { padding: 0 0.3rem; font-weight: 700; font-size: 0.88rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
