@@ -1,4 +1,4 @@
-import { CONFIG } from "./config.js?v=8";
+import { CONFIG } from "./config.js?v=10";
 import { sb, configuree, esc } from "./client.js?v=8";
 import { DOMAINES, CONTRATS, couleurDomaine } from "./listes.js?v=8";
 

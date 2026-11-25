@@ -1,4 +1,4 @@
-import { CONFIG } from "./config.js?v=8";
+import { CONFIG } from "./config.js?v=10";
 import { sb, configuree, esc, sansAccents, envoyerCv } from "./client.js?v=8";
 import {
   DOMAINES, CONTRATS, NIVEAUX, DISPONIBILITES, STATUTS, ETAPES, STATUTS_DEMANDE, TYPES_ACTIVITE, STATUTS_ENTREPRISE,

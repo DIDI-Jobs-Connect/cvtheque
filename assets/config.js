@@ -10,15 +10,15 @@ export const CONFIG = {
   // Lien de votre chaîne WhatsApp, proposé après un dépôt (laisser vide pour ne rien afficher).
   chaineWhatsapp: "",
   // Numéro WhatsApp affiché aux entreprises et aux recruteurs (ex. "22901XXXXXXXX"), vide = masqué.
-  whatsappContact: "",
+  whatsappContact: "2290154776858",
   // Formules proposées aux entreprises sur la page « Vous recrutez ? ».
   // Montants d'exemple : modifiez-les librement (texte libre).
   formules: [
     {
       nom: "Shortlist express",
-      prix: "30 000 FCFA",
+      prix: "20 000 FCFA",
       unite: "par poste",
-      resume: "3 à 5 profils présélectionnés dans notre CVthèque, envoyés sous 72 h.",
+      resume: "3 à 5 profils présélectionnés dans notre CVthèque, envoyés sous 72\u00a0h.",
       points: ["Tri des CV selon votre besoin", "Appel de vérification de chaque candidat", "Dossiers prêts à être convoqués"],
     },
     {
