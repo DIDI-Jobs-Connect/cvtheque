@@ -2,6 +2,7 @@ import { CONFIG } from "./config.js?v=11";
 import { sb, configuree, esc, sansAccents, envoyerCv, verifierCv } from "./client.js?v=8";
 import { normal, motsCles, scorer } from "./compatibilite.js?v=1";
 import { lireTexteCv, analyserCv, scoreCv, etapeConseillee } from "./lecture-cv.js?v=1";
+import { scriptAppel, scriptTexte, criteres, bloquants, conseil, SEUIL_PRESENTER, SEUIL_RESERVE } from "./appel.js?v=2";
 import {
   DOMAINES, CONTRATS, NIVEAUX, DISPONIBILITES, STATUTS, ETAPES, VILLES, STATUTS_DEMANDE, TYPES_ACTIVITE, STATUTS_ENTREPRISE,
   couleurDomaine, libelleStatut, libelleEtape,
@@ -1089,10 +1090,15 @@ async function ouvrirPoste(id) {
   await chargerDemandes();
   const d = etat.demandes.find((x) => x.id === id);
   if (!d) return;
-  const [pipeline, relances] = await Promise.all([
-    sb.from("demande_candidats").select("etape, ajoute_le, modifie_le, origine, avis_recruteur, avis_commentaire, cv_partage, candidats(id, prenom, nom, postes, ville, experience, telephone, cv_chemin, cv_nom, domaine, note)").eq("demande_id", id).order("modifie_le", { ascending: false }),
+  const colonnes = "etape, ajoute_le, modifie_le, origine, avis_recruteur, avis_commentaire, cv_partage, appel, candidats(id, prenom, nom, postes, ville, experience, telephone, cv_chemin, cv_nom, domaine, note)";
+  const lirePipeline = (cols) => sb.from("demande_candidats").select(cols).eq("demande_id", id).order("modifie_le", { ascending: false });
+  let [pipeline, relances] = await Promise.all([
+    lirePipeline(colonnes),
     sb.from("relances").select("*").eq("demande_id", id).eq("fait", false).order("echeance"),
   ]);
+  // Grille d'appel pas encore installée (supabase/appels.sql) : on charge le reste quand même.
+  etat.appelsManquants = Boolean(pipeline.error && /appel/i.test(pipeline.error.message || ""));
+  if (etat.appelsManquants) pipeline = await lirePipeline(colonnes.replace(", appel", ""));
   if (pipeline.error) return echec(pipeline.error, /column|colonne/i.test(pipeline.error.message || "") ? "Base à mettre à jour : exécutez supabase/offres.sql dans Supabase (voir le guide)." : undefined);
   etat.posteOuvert = { d, pipeline: pipeline.data.filter((p) => p.candidats), relances: relances.data || [] };
   rendrePostes();
@@ -1108,6 +1114,7 @@ function rendrePipeline() {
         <small>${esc([c.postes, c.ville, c.experience != null ? `${c.experience} an(s)` : ""].filter(Boolean).join(", "))}</small>
         ${c.note ? `<span class="etoiles">${"★".repeat(c.note)}</span>` : ""}
         ${p.origine === "candidature" ? `<span class="badge-candidature">A postulé en ligne</span>` : ""}
+        ${badgeAppel(p)}
         ${p.avis_recruteur ? `<span class="badge-avis ${esc(p.avis_recruteur)}" title="${esc(p.avis_commentaire || "")}">Recruteur : ${esc(AVIS[p.avis_recruteur])}</span>` : ""}
         <label><span class="visuellement-cache">Étape</span><select data-etape="${c.id}" data-demande="${d.id}">${options(ETAPES, null, p.etape)}</select></label>
       </article>`;
@@ -1123,6 +1130,7 @@ function rendrePipeline() {
         <button type="button" class="bouton" data-action="matching">Profils compatibles</button>
         <button type="button" class="bouton secondaire" data-action="chercher-profils">Chercher dans la CVthèque</button>
         <button type="button" class="bouton secondaire" data-action="importer-cv">Ajouter des CV reçus</button>
+        <button type="button" class="bouton secondaire" data-action="script-appel">Script d'appel</button>
         <button type="button" class="bouton secondaire" data-action="copier-message">Message pour le client</button>
         <button type="button" class="bouton discret petit" data-action="relance-poste">Relance</button>
         <button type="button" class="bouton discret petit" data-action="modifier-poste">Modifier</button>
@@ -1162,6 +1170,140 @@ function rendrePipeline() {
     await ouvrirPoste(d.id);
   });
   brancherGlisser();
+}
+
+// ---------- Appel de présélection : script et grille de notation ----------
+const MOI = CONFIG.prenomAppel || "Cadnel";
+const ORGANISATION = CONFIG.organisation || "DIDI Jobs Connect";
+
+function badgeAppel(p) {
+  const id = p.candidats.id;
+  const t = p.appel?.total;
+  if (t == null) return `<button type="button" class="badge-appel a-faire" data-appel="${id}">Appeler</button>`;
+  const niveau = p.appel.conseil === "refuse" || t < SEUIL_RESERVE ? "faible" : t >= SEUIL_PRESENTER ? "fort" : "moyen";
+  return `<button type="button" class="badge-appel ${niveau}" data-appel="${id}" title="Revoir la grille d'appel">Appel : ${t}/30</button>`;
+}
+
+function htmlScript(d) {
+  return scriptAppel(d, ORGANISATION, MOI).map((s, i) => `
+    <details class="etape-script"${i < 3 ? " open" : ""}>
+      <summary><span class="num">${i + 1}</span>${esc(s.titre)}<small>${esc(s.duree)}</small></summary>
+      ${s.astuce ? `<p class="astuce">${esc(s.astuce)}</p>` : ""}
+      <ul class="questions-script">${s.questions.map((q) => `<li>${q.titre ? `<b>${esc(q.titre)}</b>` : ""}<span class="dire">« ${esc(q.dire)} »</span>${q.attendu ? `<small class="attendu">${esc(q.attendu)}</small>` : ""}</li>`).join("")}</ul>
+    </details>`).join("");
+}
+
+const legendeGrille = `<p class="aide legende-grille"><b>${SEUIL_PRESENTER} à 30</b> : présenter au client · <b>${SEUIL_RESERVE} à ${SEUIL_PRESENTER - 1}</b> : en réserve · <b>moins de ${SEUIL_RESERVE}</b> ou critère bloquant non validé : ne pas transmettre.</p>`;
+
+function ouvrirScriptPoste() {
+  const { d } = etat.posteOuvert;
+  $("#contenu-large").innerHTML = `
+    <div class="large-tete"><h2>Script d'appel : ${esc(d.titre)}</h2>
+      <span class="envoi"><button type="button" class="bouton secondaire petit" data-action="copier-script">Copier le script</button><button type="button" class="bouton discret petit" data-action="fermer-large">Fermer</button></span></div>
+    <p class="aide">Généré à partir du poste (ville, contrat, salaire, missions et profil recherchés). Pour noter un candidat, cliquez sur « Appeler » sur sa carte : le script et la grille s'ouvrent côte à côte. Si le script vous paraît incomplet, complétez les missions dans « Modifier » (une ligne par mission, précédée d'un tiret).</p>
+    <div class="script-seul">${htmlScript(d)}</div>
+    <h3 class="titre-grille">Grille de notation (de 1 à 5)</h3>
+    <ul class="grille-apercu">${criteres(d).map(([, l]) => `<li>${esc(l)}</li>`).join("")}</ul>
+    ${legendeGrille}`;
+  $("#fenetre-large").showModal();
+}
+
+function ouvrirAppel(candidatId) {
+  if (etat.appelsManquants) return flash("Pour enregistrer les appels, exécutez d'abord supabase/appels.sql dans Supabase (voir le guide, étape 6).", true);
+  const { d, pipeline } = etat.posteOuvert;
+  const p = pipeline.find((x) => x.candidats.id === candidatId);
+  if (!p) return;
+  const c = p.candidats;
+  const a = p.appel || {};
+  const crit = criteres(d);
+  const bloq = bloquants(d);
+  const wa = numeroWhatsapp(c.telephone);
+  $("#contenu-large").innerHTML = `
+    <div class="large-tete"><h2>Appel : ${esc(c.prenom)} ${esc(c.nom)}</h2><button type="button" class="bouton discret petit" data-action="fermer-large">Fermer</button></div>
+    <p class="aide appel-contact">${esc(d.titre)}${c.telephone ? ` · <a href="tel:${esc(String(c.telephone).replace(/[^\d+]/g, ""))}">${esc(c.telephone)}</a>` : " · pas de téléphone sur la fiche"}${wa ? ` · <a target="_blank" rel="noopener" href="https://wa.me/${wa}">WhatsApp</a>` : ""}${a.le ? ` · dernier appel noté le ${jour(a.le)}` : ""}</p>
+    <div class="appel">
+      <div class="appel-script">${htmlScript(d)}</div>
+      <form class="appel-grille" id="form-appel" novalidate>
+        <fieldset>
+          <legend>Critères bloquants</legend>
+          ${bloq.map(([k, l]) => `<label class="case"><input type="checkbox" name="b-${k}"${a.bloquants?.[k] ? " checked" : ""}> ${esc(l)}</label>`).join("")}
+          <div class="deux">
+            <label class="champ"><span>Prétention salariale</span><input name="pretention" maxlength="80" value="${esc(a.pretention || "")}" placeholder="Ex. : 200 000 FCFA"></label>
+            <label class="champ"><span>Disponible</span><input name="disponible" maxlength="80" value="${esc(a.disponible || "")}" placeholder="Ex. : sous 1 semaine"></label>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Notes de 1 à 5</legend>
+          ${crit.map(([k, l]) => `<div class="critere"><span id="crit-${k}">${esc(l)}</span>
+            <span class="notes-5" role="radiogroup" aria-labelledby="crit-${k}">${[1, 2, 3, 4, 5].map((n) => `<label><input type="radio" name="n-${k}" value="${n}"${a.notes?.[k] === n ? " checked" : ""}><span>${n}</span></label>`).join("")}</span></div>`).join("")}
+        </fieldset>
+        <div class="verdict" id="verdict-appel" aria-live="polite"></div>
+        ${legendeGrille}
+        <label class="champ"><span>Note interne <small>(vous seul la voyez)</small></span><textarea name="interne" maxlength="2000" placeholder="Points de vigilance, impression générale…">${esc(a.interne || "")}</textarea></label>
+        <label class="champ"><span>Commentaire pour le client <small>(visible dans son espace avec la note)</small></span><textarea name="client" maxlength="1000" placeholder="Ex. : 5 ans en hôtel de 20 chambres, a encadré 4 personnes, disponible sous 1 semaine. Très à l'aise avec les clients.">${esc(a.commentaire_client || "")}</textarea></label>
+        <label class="champ"><span>Étape après l'appel</span><select name="etape">${options(ETAPES, null, p.etape)}</select></label>
+        <p class="erreur" id="erreur-appel" role="alert"></p>
+        <div class="envoi"><button type="submit" class="bouton">Enregistrer l'appel</button></div>
+      </form>
+    </div>`;
+  const form = $("#form-appel");
+  let etapeTouchee = Boolean(a.le);
+  const lire = () => {
+    const f = new FormData(form);
+    const notes = Object.fromEntries(crit.map(([k]) => [k, Number(f.get(`n-${k}`)) || null]).filter(([, n]) => n));
+    const coches = Object.fromEntries(bloq.map(([k]) => [k, f.get(`b-${k}`) === "on"]));
+    const total = Object.values(notes).reduce((x, y) => x + y, 0);
+    const bloquantsOk = Object.values(coches).every(Boolean);
+    return { f, notes, coches, total, bloquantsOk, complet: Object.keys(notes).length === crit.length };
+  };
+  const majVerdict = () => {
+    const { notes, total, bloquantsOk, complet } = lire();
+    const v = $("#verdict-appel");
+    if (complet) $("#erreur-appel").textContent = "";
+    if (!Object.keys(notes).length) {
+      v.className = "verdict";
+      v.innerHTML = `Notez chaque critère après l'appel. Total : <b>0/30</b>`;
+      return;
+    }
+    const k = conseil(total, bloquantsOk);
+    v.className = `verdict ${complet ? k.etape : ""}`;
+    v.innerHTML = `Total : <b>${total}/30</b>${complet ? ` · ${esc(k.texte)}` : ` · ${Object.keys(notes).length}/${crit.length} critères notés`}`;
+    if (complet && !etapeTouchee) form.etape.value = k.etape;
+  };
+  form.etape.addEventListener("change", () => (etapeTouchee = true));
+  form.addEventListener("change", (e) => e.target.name !== "etape" && majVerdict());
+  majVerdict();
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const { f, notes, coches, total, bloquantsOk, complet } = lire();
+    if (!complet) return ($("#erreur-appel").textContent = `Notez les ${crit.length} critères avant d'enregistrer.`);
+    const bouton = form.querySelector('button[type="submit"]');
+    bouton.disabled = true;
+    try {
+      const k = conseil(total, bloquantsOk);
+      const appel = {
+        le: new Date().toISOString(), bloquants: coches, notes, total, conseil: k.etape,
+        pretention: val(f, "pretention"), disponible: val(f, "disponible"),
+        interne: val(f, "interne"), commentaire_client: val(f, "client"),
+      };
+      const { error } = await sb.from("demande_candidats").update({ appel }).eq("demande_id", d.id).eq("candidat_id", c.id);
+      if (error) {
+        $("#erreur-appel").textContent = /appel/i.test(error.message || "") ? "Base à mettre à jour : exécutez supabase/appels.sql dans Supabase (voir le guide, étape 6)." : "L'enregistrement n'a pas abouti. Réessayez.";
+        return;
+      }
+      const resume = `Appel de présélection pour « ${d.titre} » : ${total}/30. ${k.texte}${appel.pretention ? ` Prétention : ${appel.pretention}.` : ""}${appel.disponible ? ` Disponible : ${appel.disponible}.` : ""}${appel.interne ? ` ${appel.interne}` : ""}`;
+      await sb.from("notes").insert({ candidat_id: c.id, type: "appel", texte: resume });
+      if (appel.pretention) await sb.from("candidats").update({ pretentions: appel.pretention }).eq("id", c.id).is("pretentions", null);
+      $("#fenetre-large").close();
+      const etape = f.get("etape");
+      if (etape && etape !== p.etape) await changerEtape(d.id, c.id, etape);
+      else await ouvrirPoste(d.id);
+      flash(`Appel enregistré : ${total}/30.`);
+    } finally {
+      bouton.disabled = false;
+    }
+  };
+  $("#fenetre-large").showModal();
 }
 
 // ---------- Partage : offre publique et lien privé du recruteur ----------
@@ -1795,6 +1937,7 @@ document.addEventListener("click", async (e) => {
   if (!cible) return;
   const ds = cible.dataset;
   if (ds.vue) return changerVue(ds.vue);
+  if (ds.appel) return ouvrirAppel(ds.appel);
   if (ds.fiche) {
     if (cible.closest("#fenetre-large")) $("#fenetre-large").close();
     return ouvrirFiche(ds.fiche);
@@ -1960,6 +2103,8 @@ document.addEventListener("click", async (e) => {
       return ouvrirPoste(d.id);
     }
     case "copier-message": return copierMessage();
+    case "script-appel": return ouvrirScriptPoste();
+    case "copier-script": return copier(scriptTexte(etat.posteOuvert.d, ORGANISATION, MOI), "Script copié : collez-le dans vos notes ou sur WhatsApp.");
     case "chercher-profils": {
       const d = etat.posteOuvert.d;
       etat.selectionPour = d;

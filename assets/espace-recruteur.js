@@ -268,6 +268,7 @@ function carteProfil(p, i, demande) {
         ${p.langues ? `<dt>Langues</dt><dd>${esc(p.langues)}</dd>` : ""}
         ${p.pretentions ? `<dt>Prétentions</dt><dd>${esc(p.pretentions)}</dd>` : ""}
       </dl>
+      ${p.evaluation ? `<div class="evaluation-didi"><p><b>Avis ${esc(ORGA)} après entretien téléphonique : ${esc(p.evaluation.total)}/30</b></p>${p.evaluation.commentaire ? `<p>${esc(p.evaluation.commentaire)}</p>` : ""}</div>` : ""}
       ${contacts(p)}
       <div class="profil-actions">
         ${p.cv_chemin ? `<button type="button" class="bouton secondaire petit" data-cv="${esc(p.cv_chemin)}">Voir le CV</button>` : `<span class="aide">CV pas encore disponible : demandez-le à ${esc(ORGA)}.</span>`}

@@ -35,6 +35,7 @@ function profil(p, i) {
         ${p.langues ? `<dt>Langues</dt><dd>${esc(p.langues)}</dd>` : ""}
         ${p.pretentions ? `<dt>Prétentions</dt><dd>${esc(p.pretentions)}</dd>` : ""}
       </dl>
+      ${p.evaluation ? `<div class="evaluation-didi"><p><b>Avis ${esc(CONFIG.organisation || "notre équipe")} après entretien téléphonique : ${esc(p.evaluation.total)}/30</b></p>${p.evaluation.commentaire ? `<p>${esc(p.evaluation.commentaire)}</p>` : ""}</div>` : ""}
       <div class="profil-actions">
         ${p.cv ? `<a class="bouton secondaire petit" href="${esc(p.cv)}" target="_blank" rel="noopener noreferrer">Voir le CV</a>` : `<span class="aide">CV transmis sur demande</span>`}
       </div>

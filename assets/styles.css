@@ -893,3 +893,56 @@ dialog.large { width: min(860px, calc(100% - 2rem)); }
 .type-pro { display: inline-block; padding: 0.05rem 0.5rem; border-radius: 99px; font-size: 0.75rem; font-weight: 700; background: color-mix(in srgb, #7b3f8e 12%, var(--papier)); color: #7b3f8e; }
 .type-pro.entreprise { background: color-mix(in srgb, var(--ok) 12%, var(--papier)); color: var(--ok); }
 @media (max-width: 520px) { .choix-type { grid-template-columns: 1fr; } }
+
+/* ---------- Appel de présélection : script et grille ---------- */
+.badge-appel { font: 700 0.72rem/1.4 var(--texte); padding: 0.1rem 0.5rem; border-radius: 999px; border: 1px solid var(--trait); background: var(--papier); color: var(--encre-2); cursor: pointer; justify-self: start; }
+.badge-appel.a-faire { border-style: dashed; color: var(--action); border-color: var(--action); }
+.badge-appel.fort { background: #dcf5e6; color: #146c3f; border-color: #b6e6c9; }
+.badge-appel.moyen { background: #fff0d9; color: #8a4f00; border-color: #f6d9a8; }
+.badge-appel.faible { background: #fdf1f2; color: var(--tampon); border-color: #f3c9cd; }
+.badge-appel:hover { filter: brightness(0.97); }
+.appel-contact a { font-weight: 700; }
+.appel { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; margin-top: 0.75rem; }
+@media (min-width: 900px) {
+  .appel { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: start; }
+  .appel-grille { position: sticky; top: 0; }
+}
+.appel-script, .script-seul { display: grid; gap: 0.5rem; }
+.etape-script { border: 1px solid var(--trait); border-radius: var(--rayon); background: var(--papier); }
+.etape-script summary { display: flex; align-items: center; gap: 0.6rem; padding: 0.6rem 0.8rem; cursor: pointer; font: 600 0.95rem/1.3 var(--titre); }
+.etape-script summary small { margin-left: auto; font: 500 0.75rem var(--texte); color: var(--encre-2); }
+.etape-script .num { display: inline-grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--action); color: #fff; font-size: 0.78rem; flex: none; }
+.etape-script .astuce { margin: 0 0.8rem 0.4rem; padding: 0.4rem 0.6rem; border-left: 3px solid var(--ambre); background: #fff8ec; font-size: 0.85rem; }
+.questions-script { list-style: none; margin: 0; padding: 0 0.8rem 0.7rem; display: grid; gap: 0.55rem; }
+.questions-script li { display: grid; gap: 0.15rem; }
+.questions-script b { font-size: 0.8rem; color: var(--encre-2); text-transform: uppercase; letter-spacing: 0.03em; }
+.questions-script .dire { font-size: 0.95rem; }
+.questions-script .attendu { color: var(--ok); font-size: 0.8rem; }
+.appel-grille { display: grid; gap: 0.75rem; padding: 0.9rem; border: 1px solid var(--trait); border-radius: var(--rayon); background: var(--fond); }
+.appel-grille fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 0.45rem; min-width: 0; }
+.appel-grille legend { font: 600 0.9rem var(--titre); margin-bottom: 0.35rem; }
+.appel-grille .case { display: flex; gap: 0.5rem; align-items: flex-start; font-size: 0.9rem; }
+.appel-grille .deux { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0.5rem; }
+.critere { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.35rem 0.75rem; font-size: 0.9rem; }
+.notes-5 { display: inline-flex; gap: 0.25rem; }
+.notes-5 label { position: relative; }
+.notes-5 input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.notes-5 span { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 8px; border: 1px solid var(--trait); background: var(--papier); font-weight: 700; transition: background var(--vite) var(--courbe), color var(--vite) var(--courbe); }
+.notes-5 input:checked + span { background: var(--action); border-color: var(--action); color: #fff; }
+.notes-5 input:focus-visible + span { outline: 3px solid var(--action); outline-offset: 2px; }
+.verdict { padding: 0.55rem 0.75rem; border-radius: 8px; background: var(--papier); border: 1px solid var(--trait); font-size: 0.92rem; }
+.verdict.presente { background: #dcf5e6; border-color: #b6e6c9; color: #146c3f; }
+.verdict.contacte { background: #fff0d9; border-color: #f6d9a8; color: #8a4f00; }
+.verdict.refuse { background: #fdf1f2; border-color: #f3c9cd; color: var(--tampon); }
+.legende-grille { font-size: 0.8rem; margin: 0; }
+.titre-grille { margin: 1rem 0 0.4rem; font-size: 1rem; }
+.grille-apercu { margin: 0 0 0.5rem; padding-left: 1.2rem; }
+.evaluation-didi { margin: 0.6rem 0; padding: 0.6rem 0.75rem; border-radius: 8px; background: #eef2ff; border-left: 3px solid var(--action); font-size: 0.9rem; }
+.evaluation-didi p { margin: 0; }
+.evaluation-didi p + p { margin-top: 0.25rem; }
+#contenu-large { grid-template-columns: minmax(0, 1fr); }
+.large-tete { flex-wrap: wrap; }
+.large-tete .envoi { margin-left: auto; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.large-tete .envoi .bouton { margin-left: 0; }
+dialog.large:has(.appel) { width: min(1240px, calc(100% - 2rem)); }
+@media (max-width: 600px) { .appel-grille .deux { grid-template-columns: minmax(0, 1fr); } #contenu-large { padding: 1rem; } }

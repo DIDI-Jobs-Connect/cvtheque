@@ -59,6 +59,9 @@ Même chose avec **`supabase/offres.sql`** (après `crm.sql`) : **New query**, c
 5. Pour distinguer les **entreprises** des **cabinets partenaires** : **New query**, collez
    **`supabase/types-comptes.sql`** → **Run**. Liens d'inscription : `espace-recruteur.html#inscription-entreprise`
    et `espace-recruteur.html#inscription-partenaire`.
+6. Pour enregistrer la **grille d'appel** de chaque candidat (bouton « Appel » sur les cartes d'un poste) :
+   **New query**, collez **`supabase/appels.sql`** → **Run**. Le client voit seulement la note sur 30
+   et votre commentaire pour lui, jamais votre note interne.
 
 ## 3. Créer votre compte d'accès
 
