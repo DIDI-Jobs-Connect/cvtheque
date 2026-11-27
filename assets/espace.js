@@ -1147,6 +1147,14 @@ function rendrePipeline() {
     flash(e.target.checked ? "Poste publié dans « Nos recrutements »." : "Poste retiré de « Nos recrutements ».");
     await ouvrirPoste(d.id);
   });
+  $("#compte-poste")?.addEventListener("change", async (e) => {
+    const { error } = await sb.from("demandes").update({ recruteur_id: e.target.value || null }).eq("id", d.id);
+    if (error) return echec(error);
+    const r = etat.recruteurs.find((x) => x.user_id === e.target.value);
+    flash(r ? `${r.nom} suit maintenant ce poste : les candidats présentés apparaissent dans son espace.` : "Aucun compte pro ne suit ce poste.");
+    await chargerDemandes();
+    await ouvrirPoste(d.id);
+  });
   $("#statut-poste").addEventListener("change", async (e) => {
     const { error } = await sb.from("demandes").update({ statut: e.target.value }).eq("id", d.id);
     if (error) return echec(error);
@@ -1181,7 +1189,28 @@ function blocPartage(d, pipeline) {
         : `<button type="button" class="bouton secondaire petit" data-action="creer-lien-recruteur">Créer le lien privé</button>`}
       <span class="aide">${presentes} ${pluriel(presentes, "profil visible", "profils visibles")} (étapes « Présenté au client » et suivantes)${avis ? `, ${avis} ${pluriel(avis, "avis reçu", "avis reçus")}` : ""}</span>
     </div>
+    ${ligneEspacePro(d, presentes)}
   </div>`;
+}
+
+// Compte pro (entreprise ou cabinet) qui suit le poste : il voit les candidats présentés, avec coordonnées.
+function ligneEspacePro(d, presentes) {
+  const valides = etat.recruteurs.filter((r) => r.statut === "valide");
+  const enAttente = etat.recruteurs.filter((r) => r.statut === "en_attente");
+  const suivi = etat.recruteurs.find((r) => r.user_id === d.recruteur_id);
+  let contenu;
+  if (valides.length) {
+    contenu = `<label><span class="visuellement-cache">Compte pro qui suit ce poste</span><select id="compte-poste">${options(valides.map((r) => [r.user_id, `${r.nom}, ${r.entreprise}`]), "Aucun compte rattaché", d.recruteur_id)}</select></label>
+      <span class="aide">${suivi ? `${esc(suivi.nom)} voit ${presentes} ${pluriel(presentes, "candidat présenté", "candidats présentés")} dans son espace, avec CV et coordonnées.` : "Choisissez le compte qui doit voir les candidats présentés."}</span>`;
+  } else if (enAttente.length) {
+    contenu = `<span class="aide">${enAttente.map((r) => `<b>${esc(r.nom)}</b> (${esc(r.entreprise)})`).join(", ")} ${pluriel(enAttente.length, "attend", "attendent")} votre validation.</span>
+      <button type="button" class="bouton secondaire petit" data-vue="recruteurs">Valider dans Comptes pro</button>`;
+  } else {
+    contenu = `<span class="aide">Aucun compte pro pour l'instant. Envoyez le lien d'inscription au client :</span>
+      <button type="button" class="bouton secondaire petit" data-action="copier-lien-entreprise">Lien entreprise</button>
+      <button type="button" class="bouton secondaire petit" data-action="copier-lien-partenaire">Lien partenaire</button>`;
+  }
+  return `<div class="partage-ligne"><b>Espace pro</b>${contenu}</div>`;
 }
 
 /** Prépare les liens de CV (30 jours) des candidats présentés, visibles sur la page du recruteur. */
